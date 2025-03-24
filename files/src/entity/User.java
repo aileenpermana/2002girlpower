@@ -25,6 +25,8 @@ public class User {
      */
     private String role;
     
+    // login() changePassword() ? dk whether to add
+    
     /**
      * Gets age of user.
      * 
@@ -33,4 +35,14 @@ public class User {
     public int getAge() {
         return this.age;
     }
+    /**
+     * Gets marital status of user.
+     * 
+     * @return the marital status of the user
+     */
+    public String getMaritalStatus() {
+        return this.maritalStatus;
+    }
+    
+    // yet to add viewProjects method
 }
