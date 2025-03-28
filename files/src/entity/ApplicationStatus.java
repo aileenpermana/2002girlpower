@@ -8,7 +8,7 @@ public enum ApplicationStatus {
      * The status of the application is pending
      */
     PENDING,
-    /**
+    /** 
      * The status of the application is successful
      */
     SUCCESSFUL,
