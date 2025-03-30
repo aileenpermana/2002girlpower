@@ -19,19 +19,11 @@ public class User {
         this.role = role;
     }
 
-    /**
-     * Gets age of user.
-     * 
-     * @return the age of the user
-     */
+    
     public int getAge() {
         return this.age;
     }
-    /**
-     * Gets marital status of user.
-     * 
-     * @return the marital status of the user
-     */
+    
     public String getMaritalStatus() {
         return this.maritalStatus;
     }
