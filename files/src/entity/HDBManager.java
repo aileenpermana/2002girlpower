@@ -1,8 +1,8 @@
-package entity;
+//package entity;
 
 /**
  * A class that represents a HDBManager
  */
-public class HDBManager extends User {
+//public class HDBManager extends User {
     
-}
+//}

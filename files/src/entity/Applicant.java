@@ -1,6 +1,6 @@
-package entity;
+//package entity;
 
 
-public class Applicant extends User {
+//public class Applicant extends User {
     
-}
+//}
