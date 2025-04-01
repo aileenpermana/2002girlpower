@@ -1,19 +1,18 @@
+// In entity/RegistrationStatus.java
 package entity;
 
-/**
- * This enum represents the status of the registration
- */
 public enum RegistrationStatus {
-    /**
-     * The status of the registration is pending
-     */
-    PENDING,
-    /**
-     * The status of the registration is approved
-     */
-    APPROVED,
-    /**
-     * The status of the registration is rejected
-     */
-    REJECTED
+    PENDING("Pending"),
+    APPROVED("Approved"),
+    REJECTED("Rejected");
+    
+    private final String displayValue;
+    
+    RegistrationStatus(String displayValue) {
+        this.displayValue = displayValue;
+    }
+    
+    public String getDisplayValue() {
+        return displayValue;
+    }
 }
