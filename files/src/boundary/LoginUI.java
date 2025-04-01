@@ -23,7 +23,7 @@ public class LoginUI {
         System.out.print("Enter your NRIC: ");
         String nric = sc.nextLine();
         
-        System.out.print("Enter your password: ");
+        System.out.print("Enter your password (if you are a new user, use default password 'password'):");
         String password = sc.nextLine();
         
         // Check if user exists
@@ -79,14 +79,13 @@ public class LoginUI {
         
         // Use default password
         String password = "password";
-        System.out.println("Default password is set to 'password'. Please change it after logging in.");
         
         // Create registration control and register
         registrationControl = new RegistrationControl(name, nric, password, age, maritalStatus);
         
         if (registrationControl.validateCredentials()) {
             registrationControl.registerUser();
-            System.out.println("\nUser registered successfully! ");
+            System.out.println("\nUser registered successfully! Please change default password upon logging in.");
             System.out.println("Welcome, " + name + "! ");
             return false;
 
