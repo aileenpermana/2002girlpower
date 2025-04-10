@@ -1,20 +1,17 @@
 package entity;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
- * Represents a BTO project in the HDB system.
+ * Represents a BTO Project in the system.
+ * Demonstrates encapsulation with private fields and public getters/setters.
  */
 public class Project {
-    private final String projectID;
+    private String projectID;
     private String projectName;
     private String neighborhood;
-    private  Map<FlatType, Integer> totalUnits;
-    private  Map<FlatType, Integer> availableUnits;
+    private Map<FlatType, Integer> totalUnits;
+    private Map<FlatType, Integer> availableUnits;
     private Date applicationOpenDate;
     private Date applicationCloseDate;
     private HDBManager managerInCharge;
@@ -25,26 +22,34 @@ public class Project {
     
     /**
      * Constructor for Project
+     * @param projectID unique project ID
+     * @param projectName name of the project
+     * @param neighborhood neighborhood location
+     * @param totalUnits map of flat types to unit counts
+     * @param openDate application opening date
+     * @param closeDate application closing date
+     * @param manager manager in charge
+     * @param officerSlots maximum number of officer slots
      */
-    public Project(String projectID, String projectName, String neighborhood, 
-                   Map<FlatType, Integer> totalUnits, Date applicationOpenDate, 
-                   Date applicationCloseDate, HDBManager managerInCharge, int maxOfficerSlots) {
+    public Project(String projectID, String projectName, String neighborhood,
+                   Map<FlatType, Integer> totalUnits, Date openDate, Date closeDate,
+                   HDBManager manager, int officerSlots) {
         this.projectID = projectID;
         this.projectName = projectName;
         this.neighborhood = neighborhood;
         this.totalUnits = new HashMap<>(totalUnits);
-        this.availableUnits = new HashMap<>(totalUnits); // Initially available = total
-        this.applicationOpenDate = applicationOpenDate;
-        this.applicationCloseDate = applicationCloseDate;
-        this.managerInCharge = managerInCharge;
+        this.availableUnits = new HashMap<>(totalUnits); // Initially all units are available
+        this.applicationOpenDate = openDate;
+        this.applicationCloseDate = closeDate;
+        this.managerInCharge = manager;
         this.officers = new ArrayList<>();
-        this.maxOfficerSlots = maxOfficerSlots;
-        this.availableOfficerSlots = maxOfficerSlots;
-        this.isVisible = false; // Default to not visible
+        this.maxOfficerSlots = officerSlots;
+        this.availableOfficerSlots = officerSlots;
+        this.isVisible = true; // Default to visible
     }
     
     /**
-     * Get project ID
+     * Get the project ID
      * @return project ID
      */
     public String getProjectID() {
@@ -52,15 +57,7 @@ public class Project {
     }
     
     /**
-     * Set project name
-     * @param projectName new project name
-     */
-    public void setProjectName(String projectName) {
-        this.projectName = projectName;
-    }
-    
-    /**
-     * Get project name
+     * Get the project name
      * @return project name
      */
     public String getProjectName() {
@@ -68,15 +65,15 @@ public class Project {
     }
     
     /**
-     * Set neighborhood
-     * @param neighborhood new neighborhood
+     * Set the project name
+     * @param projectName new project name
      */
-    public void setNeighborhood(String neighborhood) {
-        this.neighborhood = neighborhood;
+    public void setProjectName(String projectName) {
+        this.projectName = projectName;
     }
     
     /**
-     * Get neighborhood
+     * Get the neighborhood
      * @return neighborhood
      */
     public String getNeighborhood() {
@@ -84,130 +81,165 @@ public class Project {
     }
     
     /**
-     * Get list of flat types available in this project
+     * Set the neighborhood
+     * @param neighborhood new neighborhood
+     */
+    public void setNeighborhood(String neighborhood) {
+        this.neighborhood = neighborhood;
+    }
+    
+    /**
+     * Get all flat types in this project
+     * @return set of flat types
+     */
+    public Set<FlatType> getFlatTypes() {
+        return totalUnits.keySet();
+    }
+    
+    /**
+     * Get all flat types in this project as a List
      * @return list of flat types
      */
-    public List<FlatType> getFlatTypes() {
+    public List<FlatType> getFlatTypesList() {
         return new ArrayList<>(totalUnits.keySet());
     }
     
     /**
-     * Set the number of units for a specific flat type
-     * @param flatType the flat type
+     * Check if this project has a specific flat type
+     * @param type the flat type to check
+     * @return true if the project has this flat type, false otherwise
+     */
+    public boolean hasFlatType(FlatType type) {
+        return totalUnits.containsKey(type) && totalUnits.get(type) > 0;
+    }
+    
+    /**
+     * Get total units for a flat type
+     * @param type the flat type
+     * @return number of units, 0 if type not available
+     */
+    public int getTotalUnitsByType(FlatType type) {
+        return totalUnits.getOrDefault(type, 0);
+    }
+    
+    /**
+     * Set the number of units for a flat type
+     * @param type the flat type
      * @param count the new count
      */
-    public void setNumberOfUnitsByType(FlatType flatType, int count) {
-        totalUnits.put(flatType, count);
+    public void setNumberOfUnitsByType(FlatType type, int count) {
+        // Update total units
+        totalUnits.put(type, count);
         
-        // Update available units as well
-        // This assumes no units have been booked yet
-        availableUnits.put(flatType, count);
+        // Update available units (can't be more than total)
+        int currentAvailable = availableUnits.getOrDefault(type, 0);
+        availableUnits.put(type, Math.min(currentAvailable, count));
     }
     
     /**
-     * Get the number of available units by flat type
-     * @param flatType the flat type
-     * @return number of available units
+     * Get available units for a flat type
+     * @param type the flat type
+     * @return number of available units, 0 if type not available
      */
-    public int getAvailableUnitsByType(FlatType flatType) {
-        return availableUnits.getOrDefault(flatType, 0);
+    public int getAvailableUnitsByType(FlatType type) {
+        return availableUnits.getOrDefault(type, 0);
     }
     
     /**
-     * Get the total number of units by flat type
-     * @param flatType the flat type
-     * @return total number of units
+     * Set the number of available units for a flat type
+     * @param type the flat type
+     * @param count the new count of available units
      */
-    public int getTotalUnitsByType(FlatType flatType) {
-        return totalUnits.getOrDefault(flatType, 0);
+    public void setAvailableUnitsByType(FlatType type, int count) {
+        // Can't have more available units than total units
+        int total = totalUnits.getOrDefault(type, 0);
+        if (count > total) {
+            count = total;
+        }
+        
+        // Can't have negative available units
+        if (count < 0) {
+            count = 0;
+        }
+        
+        availableUnits.put(type, count);
     }
     
     /**
      * Decrement available units for a flat type
-     * @param flatType the flat type
+     * @param type the flat type
      * @return true if successful, false if no units available
      */
-    public boolean decrementAvailableUnits(FlatType flatType) {
-        int current = availableUnits.getOrDefault(flatType, 0);
-        if (current > 0) {
-            availableUnits.put(flatType, current - 1);
-            return true;
+    public boolean decrementAvailableUnits(FlatType type) {
+        int available = availableUnits.getOrDefault(type, 0);
+        if (available <= 0) {
+            return false;
         }
-        return false;
+        
+        availableUnits.put(type, available - 1);
+        return true;
     }
     
     /**
      * Increment available units for a flat type
-     * @param flatType the flat type
+     * @param type the flat type
+     * @return true if successful, false if already at maximum
      */
-    public void incrementAvailableUnits(FlatType flatType) {
-        int current = availableUnits.getOrDefault(flatType, 0);
-        int max = totalUnits.getOrDefault(flatType, 0);
-        if (current < max) {
-            availableUnits.put(flatType, current + 1);
+    public boolean incrementAvailableUnits(FlatType type) {
+        int available = availableUnits.getOrDefault(type, 0);
+        int total = totalUnits.getOrDefault(type, 0);
+        
+        if (available >= total) {
+            return false;
         }
+        
+        availableUnits.put(type, available + 1);
+        return true;
     }
     
     /**
-     * Set available units by flat type
-     * @param flatType the flat type
-     * @param count the new count
-     */
-    public void setAvailableUnitsByType(FlatType flatType, int count) {
-        int max = totalUnits.getOrDefault(flatType, 0);
-        availableUnits.put(flatType, Math.min(count, max));
-    }
-    
-    /**
-     * Set application open date
-     * @param applicationOpenDate new application open date
-     */
-    public void setApplicationOpenDate(Date applicationOpenDate) {
-        this.applicationOpenDate = applicationOpenDate;
-    }
-    
-    /**
-     * Get application open date
-     * @return application open date
+     * Get the application opening date
+     * @return opening date
      */
     public Date getApplicationOpenDate() {
         return applicationOpenDate;
     }
     
     /**
-     * Set application close date
-     * @param applicationCloseDate new application close date
+     * Set the application opening date
+     * @param date new opening date
      */
-    public void setApplicationCloseDate(Date applicationCloseDate) {
-        this.applicationCloseDate = applicationCloseDate;
+    public void setApplicationOpenDate(Date date) {
+        this.applicationOpenDate = date;
     }
     
     /**
-     * Get application close date
-     * @return application close date
+     * Get the application closing date
+     * @return closing date
      */
     public Date getApplicationCloseDate() {
         return applicationCloseDate;
     }
     
     /**
-     * Get visibility status
-     * @return true if visible, false otherwise
+     * Set the application closing date
+     * @param date new closing date
      */
-    public boolean isVisible() {
-        return isVisible;
+    public void setApplicationCloseDate(Date date) {
+        this.applicationCloseDate = date;
     }
     
     /**
-     * Set visibility status
-     * @param visible new visibility status
+     * Check if the project is open for application
+     * @return true if within application period, false otherwise
      */
-    public void setVisible(boolean visible) {
-        this.isVisible = visible;
+    public boolean isOpenForApplication() {
+        Date now = new Date();
+        return now.compareTo(applicationOpenDate) >= 0 && now.compareTo(applicationCloseDate) <= 0;
     }
     
     /**
-     * Get manager in charge
+     * Get the manager in charge
      * @return manager in charge
      */
     public HDBManager getManagerInCharge() {
@@ -215,24 +247,59 @@ public class Project {
     }
     
     /**
-     * Set officer slots
-     * @param maxOfficerSlots new max officer slots
+     * Get the list of officers assigned to this project
+     * @return list of officers
      */
-    public void setOfficerSlots(int maxOfficerSlots) {
-        // Set new max slots and adjust available slots accordingly
-        int diff = maxOfficerSlots - this.maxOfficerSlots;
-        this.maxOfficerSlots = maxOfficerSlots;
-        this.availableOfficerSlots += diff;
-        
-        // Ensure available slots is never negative
-        if (this.availableOfficerSlots < 0) {
-            this.availableOfficerSlots = 0;
-        }
+    public List<HDBOfficer> getOfficers() {
+        return new ArrayList<>(officers);
     }
     
     /**
-     * Get available officer slots
-     * @return available officer slots
+     * Add an officer to this project
+     * @param officer the officer to add
+     * @return true if addition was successful, false otherwise
+     */
+    public boolean addOfficer(HDBOfficer officer) {
+        if (availableOfficerSlots <= 0) {
+            return false;
+        }
+        
+        if (!officers.contains(officer)) {
+            officers.add(officer);
+            availableOfficerSlots--;
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Remove an officer from this project
+     * @param officer the officer to remove
+     * @return true if removal was successful, false otherwise
+     */
+    public boolean removeOfficer(HDBOfficer officer) {
+        if (officers.remove(officer)) {
+            availableOfficerSlots++;
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Set the maximum number of officer slots
+     * @param slots the new maximum
+     */
+    public void setOfficerSlots(int slots) {
+        // Ensure slots is at least equal to the number of current officers
+        this.maxOfficerSlots = Math.max(slots, officers.size());
+        this.availableOfficerSlots = maxOfficerSlots - officers.size();
+    }
+    
+    /**
+     * Get the available officer slots
+     * @return available slots
      */
     public int getAvailableOfficerSlots() {
         return availableOfficerSlots;
@@ -243,80 +310,87 @@ public class Project {
      * @return true if successful, false if no slots available
      */
     public boolean decrementOfficerSlots() {
-        if (availableOfficerSlots > 0) {
-            availableOfficerSlots--;
-            return true;
+        if (availableOfficerSlots <= 0) {
+            return false;
         }
-        return false;
+        
+        availableOfficerSlots--;
+        return true;
     }
     
     /**
-     * Add an officer to this project
-     * @param officer the officer to add
+     * Increment available officer slots
+     * @return true if successful, false if already at maximum
      */
-    public void addOfficer(HDBOfficer officer) {
-        if (!officers.contains(officer)) {
-            officers.add(officer);
+    public boolean incrementOfficerSlots() {
+        if (availableOfficerSlots >= maxOfficerSlots) {
+            return false;
         }
+        
+        availableOfficerSlots++;
+        return true;
     }
     
     /**
-     * Get all officers assigned to this project
-     * @return list of officers
+     * Check if the project is visible
+     * @return visibility status
      */
-    public List<HDBOfficer> getOfficers() {
-        return new ArrayList<>(officers);
+    public boolean isVisible() {
+        return isVisible;
     }
     
     /**
-     * Check if project is open for applications
-     * @return true if open, false otherwise
+     * Set the project visibility
+     * @param visible new visibility
      */
-    public boolean isOpenForApplication() {
-        Date now = new Date();
-        return now.after(applicationOpenDate) && now.before(applicationCloseDate) && isVisible;
+    public void setVisible(boolean visible) {
+        this.isVisible = visible;
     }
     
     /**
-     * Check if a user is eligible to apply for this project
+     * Check if a user is eligible for this project
      * @param user the user to check
      * @return true if eligible, false otherwise
      */
     public boolean checkEligibility(User user) {
-        // Singles, 35 years old and above, can ONLY apply for 2-Room
-        if (user.getMaritalStatus() == MaritalStatus.SINGLE) {
-            if (user.getAge() < 35) {
-                return false; // Singles must be at least 35
+        // HDB Managers are not eligible for any project
+        if (user instanceof HDBManager) {
+            return false;
+        }
+        
+        // HDB Officers who are handling this project cannot apply
+        if (user instanceof HDBOfficer) {
+            HDBOfficer officer = (HDBOfficer) user;
+            if (officer.isHandlingProject(this)) {
+                return false;
             }
-            
-            // Check if the project has 2-Room flats
-            return hasFlatType(FlatType.TWO_ROOM);
-        } 
-        // Married, 21 years old and above, can apply for any flat type
-        else if (user.getMaritalStatus() == MaritalStatus.MARRIED) {
-            return user.getAge() >= 21; // Married applicants must be at least 21
+        }
+        
+        // Check age and marital status
+        int age = user.getAge();
+        MaritalStatus maritalStatus = user.getMaritalStatus();
+        
+        if (maritalStatus == MaritalStatus.SINGLE) {
+            // Singles must be 35 years or older and project must have 2-Room units
+            return age >= 35 && totalUnits.containsKey(FlatType.TWO_ROOM);
+        } else if (maritalStatus == MaritalStatus.MARRIED) {
+            // Married couples must be 21 years or older
+            return age >= 21;
         }
         
         return false;
     }
     
-    /**
-     * Check if project has a specific flat type
-     * @param flatType the flat type to check
-     * @return true if available, false otherwise
-     */
-    public boolean hasFlatType(FlatType flatType) {
-        return totalUnits.containsKey(flatType) && totalUnits.get(flatType) > 0;
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) return true;
+        if (obj == null || getClass() != obj.getClass()) return false;
+        Project project = (Project) obj;
+        return projectID.equals(project.projectID);
     }
     
     @Override
-    public String toString() {
-        return "Project{" +
-                "projectID='" + projectID + '\'' +
-                ", projectName='" + projectName + '\'' +
-                ", neighborhood='" + neighborhood + '\'' +
-                ", applicationOpenDate=" + applicationOpenDate +
-                ", applicationCloseDate=" + applicationCloseDate +
-                '}';
+    public int hashCode() {
+        return Objects.hash(projectID);
     }
 }

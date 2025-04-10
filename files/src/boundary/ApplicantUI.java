@@ -384,9 +384,9 @@ public class ApplicantUI {
                 sc.nextLine();
                 return;
             }
-        }
+        }}
         
-        // Confirm registration
+        /*  Confirm registration
         System.out.print("Confirm registration as HDB Officer for " + project.getProjectName() + "? (Y/N): ");
         String confirm = sc.nextLine();
         
@@ -407,7 +407,9 @@ public class ApplicantUI {
         
         System.out.println("Press Enter to continue...");
         sc.nextLine();
+
     }
+        */
     
     /**
      * View all applications made by the applicant

@@ -1,5 +1,6 @@
 package entity;
 
+import control.ProjectControl;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -9,6 +10,7 @@ import java.util.Map;
 /**
  * Represents an HDB Manager in the BTO system.
  * Extends the User class with manager-specific functionality.
+ * Demonstrates inheritance (extends User) and method overriding.
  */
 public class HDBManager extends User {
     private String managerID;
@@ -97,6 +99,10 @@ public class HDBManager extends User {
         // Add to managing projects
         managingProjects.add(project);
         
+        // Save to database via Project Control
+        ProjectControl projectControl = new ProjectControl();
+        projectControl.addProject(project);
+        
         return project;
     }
     
@@ -152,7 +158,9 @@ public class HDBManager extends User {
             project.setOfficerSlots((int) details.get("officerSlots"));
         }
         
-        return true;
+        // Save changes via Project Control
+        ProjectControl projectControl = new ProjectControl();
+        return projectControl.updateProject(project);
     }
     
     /**
@@ -169,21 +177,28 @@ public class HDBManager extends User {
         // Remove from managing projects
         managingProjects.remove(project);
         
-        // In a real system, the project would be removed from the database
-        
-        return true;
+        // Delete via Project Control
+        ProjectControl projectControl = new ProjectControl();
+        return projectControl.deleteProject(project);
     }
     
     /**
      * Toggle the visibility of a project
      * @param project the project to toggle
      * @param visible whether the project should be visible
+     * @return true if successful, false otherwise
      */
-    public void toggleVisibility(Project project, boolean visible) {
+    public boolean toggleVisibility(Project project, boolean visible) {
         // Check if manager is managing this project
-        if (managingProjects.contains(project)) {
-            project.setVisible(visible);
+        if (!managingProjects.contains(project)) {
+            return false;
         }
+        
+        project.setVisible(visible);
+        
+        // Save changes via Project Control
+        ProjectControl projectControl = new ProjectControl();
+        return projectControl.updateProject(project);
     }
     
     /**
@@ -195,7 +210,7 @@ public class HDBManager extends User {
     }
     
     /**
-     * Approve or reject an HDB Officer's registration for a project
+     * Process an officer's registration for a project
      * @param officer the officer
      * @param project the project
      * @param approve true to approve, false to reject
@@ -214,60 +229,25 @@ public class HDBManager extends User {
         
         if (approve) {
             // Add officer to project
-            project.addOfficer(officer);
-            officer.addHandlingProject(project);
-            
-            // Update available slots
-            project.decrementOfficerSlots();
-        }
-        
-        return true;
-    }
-    
-    /**
-     * Process applications for a project
-     * @param applications list of applications to process
-     * @return number of applications processed
-     */
-    public int processApplications(List<Application> applications) {
-        int processed = 0;
-        
-        for (Application app : applications) {
-            Project project = app.getProject();
-            
-            // Check if manager is managing this project
-            if (!managingProjects.contains(project)) {
-                continue;
-            }
-            
-            // Check if application is pending
-            if (app.getStatus() != ApplicationStatus.PENDING) {
-                continue;
-            }
-            
-            // Check if there are available units of the requested type
-            // In a real system, you would determine the flat type requested in the application
-            FlatType requestedType = FlatType.TWO_ROOM; // Placeholder
-            
-            if (project.getAvailableUnitsByType(requestedType) > 0) {
-                // Approve the application
-                app.setStatus(ApplicationStatus.SUCCESSFUL);
+            boolean success = project.addOfficer(officer);
+            if (success) {
+                officer.addHandlingProject(project);
                 
-                // Decrement available units
-                project.decrementAvailableUnits(requestedType);
-            } else {
-                // Reject the application
-                app.setStatus(ApplicationStatus.UNSUCCESSFUL);
+                // Save changes via Project Control
+                ProjectControl projectControl = new ProjectControl();
+                projectControl.updateProject(project);
+                return true;
             }
-            
-            processed++;
+        } else {
+            // For rejection, no changes needed to the project
+            return true;
         }
         
-        return processed;
+        return false;
     }
     
     /**
-     * Approve or reject a withdrawal request
+     * Process a withdrawal request
      * @param application the application to withdraw
      * @param approve true to approve, false to reject
      * @return true if operation was successful, false otherwise
@@ -301,6 +281,10 @@ public class HDBManager extends User {
                         application.setBookedFlat(null);
                     }
                 }
+                
+                // Save changes via Project Control
+                ProjectControl projectControl = new ProjectControl();
+                projectControl.updateProject(project);
             }
         }
         

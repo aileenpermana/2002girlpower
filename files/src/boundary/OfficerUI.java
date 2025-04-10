@@ -1,14 +1,13 @@
 package boundary;
 
-import entity.*;
-import control.ProjectControl;
 import control.ApplicationControl;
-import control.HDBOfficerControl;
 import control.EnquiryControl;
-import utils.ScreenUtil;
-
+import control.HDBOfficerControl;
+import control.ProjectControl;
+import entity.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import utils.ScreenUtil;
 
 /**
  * UI class for HDB Officer operations in the BTO Management System.
@@ -341,8 +340,7 @@ public class OfficerUI {
         }
         
         System.out.println("\nSelect flat type to update:");
-        List<FlatType> flatTypes = project.getFlatTypes();
-        for (int i = 0; i < flatTypes.size(); i++) {
+        List<FlatType> flatTypes = new ArrayList<>(project.getFlatTypes());        for (int i = 0; i < flatTypes.size(); i++) {
             System.out.println((i + 1) + ". " + flatTypes.get(i).getDisplayValue());
         }
         

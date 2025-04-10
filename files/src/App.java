@@ -6,6 +6,7 @@ import entity.Applicant;
 import entity.HDBManager;
 import entity.HDBOfficer;
 import entity.User;
+import utils.ProjectFileManager;
 
 /**
  * Main application class for the BTO Management System.
@@ -31,12 +32,31 @@ public class App {
     }
     
     /**
+     * Initialize application data
+     */
+    public static void initializeData() {
+        try {
+            System.out.println("Initializing application data...");
+            // Initialize project data from CSV
+            ProjectFileManager projectFileManager = ProjectFileManager.getInstance();
+            projectFileManager.loadInitialProjectData();
+            System.out.println("Data initialization complete.");
+        } catch (Exception e) {
+            System.out.println("Error initializing data: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    /**
      * Main method to start the application.
      * @param args command line arguments
      */
     public static void main(String[] args) {
         // Display welcome message
         System.out.println("Starting BTO Management System...");
+        
+        // Initialize application data
+        initializeData();
         
         // Initialize login UI
         LoginUI loginUI = new LoginUI();
@@ -49,7 +69,6 @@ public class App {
         
         // Get authenticated user
         User currentUser = loginUI.getCurrentUser();
-        
         if (currentUser != null) {
             // Route to appropriate UI based on user role
             if (currentUser instanceof HDBManager) {

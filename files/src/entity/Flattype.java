@@ -1,7 +1,8 @@
 package entity;
 
 /**
- * Enum representing the available flat types in the BTO system.
+ * Enumeration of flat types in the BTO system.
+ * Demonstrates the use of Enum in Java to represent a fixed set of values.
  */
 public enum FlatType {
     TWO_ROOM("2-Room"),
@@ -9,31 +10,52 @@ public enum FlatType {
     
     private final String displayValue;
     
+    /**
+     * Constructor for FlatType
+     * @param displayValue the display value for the flat type
+     */
     FlatType(String displayValue) {
         this.displayValue = displayValue;
     }
     
+    /**
+     * Get the display value
+     * @return display value
+     */
     public String getDisplayValue() {
         return displayValue;
     }
     
-    @Override
-    public String toString() {
-        return displayValue;
-    }
-    
     /**
-     * Converts a string representation to the corresponding enum value.
-     * @param text The string to convert
-     * @return The matching FlatType enum
-     * @throws IllegalArgumentException if no matching flat type is found
+     * Get a FlatType from its display value
+     * @param displayValue the display value
+     * @return the corresponding FlatType, or null if not found
      */
-    public static FlatType fromString(String text) {
-        for (FlatType type : FlatType.values()) {
-            if (type.displayValue.equalsIgnoreCase(text)) {
+    public static FlatType fromDisplayValue(String displayValue) {
+        for (FlatType type : values()) {
+            if (type.getDisplayValue().equalsIgnoreCase(displayValue)) {
                 return type;
             }
         }
-        throw new IllegalArgumentException("No flat type found with value: " + text);
+        return null;
+    }
+    
+    /**
+     * Convert a string representation to a FlatType
+     * @param str the string representation (can be the enum name or display value)
+     * @return the corresponding FlatType, or null if not found
+     */
+    public static FlatType fromString(String str) {
+        if (str == null || str.trim().isEmpty()) {
+            return null;
+        }
+        
+        // Try to match by enum name
+        try {
+            return FlatType.valueOf(str.toUpperCase().replace("-", "_"));
+        } catch (IllegalArgumentException e) {
+            // Try to match by display value
+            return fromDisplayValue(str);
+        }
     }
 }
