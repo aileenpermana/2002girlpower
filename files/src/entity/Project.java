@@ -10,11 +10,11 @@ import java.util.Map;
  * Represents a BTO project in the HDB system.
  */
 public class Project {
-    private String projectID;
+    private final String projectID;
     private String projectName;
     private String neighborhood;
-    private Map<FlatType, Integer> totalUnits;
-    private Map<FlatType, Integer> availableUnits;
+    private  Map<FlatType, Integer> totalUnits;
+    private  Map<FlatType, Integer> availableUnits;
     private Date applicationOpenDate;
     private Date applicationCloseDate;
     private HDBManager managerInCharge;

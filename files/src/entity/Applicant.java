@@ -140,4 +140,5 @@ public class Applicant extends User {
         }
         return false;
     }
+    
 }

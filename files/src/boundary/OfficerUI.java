@@ -14,12 +14,12 @@ import java.util.*;
  * UI class for HDB Officer operations in the BTO Management System.
  */
 public class OfficerUI {
-    private HDBOfficer currentUser;
-    private Scanner sc;
-    private ProjectControl projectControl;
-    private ApplicationControl applicationControl;
-    private HDBOfficerControl officerControl;
-    private EnquiryControl enquiryControl;
+    private final HDBOfficer currentUser;
+    private final Scanner sc;
+    private final ProjectControl projectControl;
+    private final ApplicationControl applicationControl;
+    private final HDBOfficerControl officerControl;
+    private final EnquiryControl enquiryControl;
     
     /**
      * Constructor for OfficerUI
@@ -58,37 +58,22 @@ public class OfficerUI {
             String choice = sc.nextLine();
             
             switch (choice) {
-                case "1":
-                    viewAvailableProjects();
-                    break;
-                case "2":
-                    viewMyApplications();
-                    break;
-                case "3":
-                    viewOfficerRegistrations();
-                    break;
-                case "4":
-                    viewHandledProjects();
-                    break;
-                case "5":
-                    flatSelectionMenu();
-                    break;
-                case "6":
-                    viewAndReplyToEnquiries();
-                    break;
-                case "7":
-                    viewProfile();
-                    break;
-                case "8":
-                    changePassword();
-                    break;
-                case "9":
+                case "1" -> viewAvailableProjects();
+                case "2" -> viewMyApplications();
+                case "3" -> viewOfficerRegistrations();
+                case "4" -> viewHandledProjects();
+                case "5" -> flatSelectionMenu();
+                case "6" -> viewAndReplyToEnquiries();
+                case "7" -> viewProfile();
+                case "8" -> changePassword();
+                case "9" -> {
                     exit = true;
                     System.out.println("Signing out...");
-                    break;
-                default:
+                }
+                default -> {
                     System.out.println("Invalid choice. Press Enter to continue.");
                     sc.nextLine();
+                }
             }
         }
     }
@@ -326,24 +311,15 @@ public class OfficerUI {
             String choice = sc.nextLine();
             
             switch (choice) {
-                case "1":
-                    updateAvailableFlats(selectedProject);
-                    break;
-                case "2":
-                    retrieveApplication(selectedProject);
-                    break;
-                case "3":
-                    bookFlat(selectedProject);
-                    break;
-                case "4":
-                    generateReceipt(selectedProject);
-                    break;
-                case "5":
-                    done = true;
-                    break;
-                default:
+                case "1" -> updateAvailableFlats(selectedProject);
+                case "2" -> retrieveApplication(selectedProject);
+                case "3" -> bookFlat(selectedProject);
+                case "4" -> generateReceipt(selectedProject);
+                case "5" -> done = true;
+                default -> {
                     System.out.println("Invalid choice. Press Enter to continue.");
                     sc.nextLine();
+                }
             }
         }
     }
@@ -695,52 +671,52 @@ public class OfficerUI {
         
         SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy HH:mm");
         
+        OUTER:
         while (true) {
             ScreenUtil.clearScreen();
             System.out.println("\n===== Enquiries for " + selectedProject.getProjectName() + " =====");
-            
-            System.out.printf("%-5s %-20s %-20s %-30s\n", 
-                            "No.", "Applicant", "Date", "Content");
+            System.out.printf("%-5s %-20s %-20s %-30s\n",
+                    "No.", "Applicant", "Date", "Content");
             System.out.println("--------------------------------------------------------------------------------");
-            
             for (int i = 0; i < enquiries.size(); i++) {
                 Enquiry enquiry = enquiries.get(i);
-                System.out.printf("%-5d %-20s %-20s %-30s\n", 
-                                (i + 1),
-                                truncateString(enquiry.getApplicant().getName(), 20),
-                                dateFormat.format(enquiry.getSubmissionDate()),
-                                truncateString(enquiry.getContent(), 30));
+                System.out.printf("%-5d %-20s %-20s %-30s\n",
+                        (i + 1),
+                        truncateString(enquiry.getApplicant().getName(), 20),
+                        dateFormat.format(enquiry.getSubmissionDate()),
+                        truncateString(enquiry.getContent(), 30));
             }
-            
             System.out.println("\nOptions:");
             System.out.println("1. View Enquiry Details");
             System.out.println("2. Return to Main Menu");
-            
             System.out.print("\nEnter your choice: ");
             String choice = sc.nextLine();
-            
-            if (choice.equals("1")) {
-                System.out.print("Enter enquiry number to view details: ");
-                try {
-                    int enquiryIndex = Integer.parseInt(sc.nextLine()) - 1;
-                    if (enquiryIndex >= 0 && enquiryIndex < enquiries.size()) {
-                        viewAndReplyToEnquiry(enquiries.get(enquiryIndex));
-                        
-                        // Refresh the enquiry list in case of updates
-                        enquiries = enquiryControl.getEnquiriesForProject(selectedProject);
-                    } else {
-                        System.out.println("Invalid enquiry number. Press Enter to continue.");
+            switch (choice) {
+                case "1" -> {
+                    System.out.print("Enter enquiry number to view details: ");
+                    try {
+                        int enquiryIndex = Integer.parseInt(sc.nextLine()) - 1;
+                        if (enquiryIndex >= 0 && enquiryIndex < enquiries.size()) {
+                            viewAndReplyToEnquiry(enquiries.get(enquiryIndex));
+                            
+                            // Refresh the enquiry list in case of updates
+                            enquiries = enquiryControl.getEnquiriesForProject(selectedProject);
+                        } else {
+                            System.out.println("Invalid enquiry number. Press Enter to continue.");
+                            sc.nextLine();
+                        }
+                    } catch (NumberFormatException e) {
+                        System.out.println("Invalid input. Press Enter to continue.");
                         sc.nextLine();
                     }
-                } catch (NumberFormatException e) {
-                    System.out.println("Invalid input. Press Enter to continue.");
+                }
+                case "2" -> {
+                    break OUTER;
+                }
+                default -> {
+                    System.out.println("Invalid choice. Press Enter to continue.");
                     sc.nextLine();
                 }
-            } else if (choice.equals("2")) {
-                break;
-            } else {
-                System.out.println("Invalid choice. Press Enter to continue.");
-                sc.nextLine();
             }
         }
     }
@@ -752,17 +728,17 @@ public class OfficerUI {
     private void viewAndReplyToEnquiry(Enquiry enquiry) {
         SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy HH:mm");
         
+        OUTER:
         while (true) {
             ScreenUtil.clearScreen();
             System.out.println("\n===== Enquiry Details =====");
             System.out.println("Enquiry ID: " + enquiry.getEnquiryID());
-            System.out.println("From: " + enquiry.getApplicant().getName() + " (" + 
-                             enquiry.getApplicant().getNRIC() + ")");
+            System.out.println("From: " + enquiry.getApplicant().getName() + " (" +
+                    enquiry.getApplicant().getNRIC() + ")");
             System.out.println("Project: " + enquiry.getProject().getProjectName());
             System.out.println("Date: " + dateFormat.format(enquiry.getSubmissionDate()));
             System.out.println("\nContent:");
             System.out.println(enquiry.getContent());
-            
             List<String> replies = enquiry.getReplies();
             if (!replies.isEmpty()) {
                 System.out.println("\nReplies:");
@@ -770,33 +746,33 @@ public class OfficerUI {
                     System.out.println((i + 1) + ". " + replies.get(i));
                 }
             }
-            
             System.out.println("\nOptions:");
             System.out.println("1. Reply to Enquiry");
             System.out.println("2. Return to Enquiry List");
-            
             System.out.print("\nEnter your choice: ");
             String choice = sc.nextLine();
-            
-            if (choice.equals("1")) {
-                System.out.println("\nEnter your reply:");
-                String reply = sc.nextLine();
-                
-                if (!reply.trim().isEmpty()) {
-                    // Add reply to the enquiry
-                    enquiryControl.addReply(enquiry, reply, currentUser);
-                    System.out.println("Reply submitted successfully!");
-                    System.out.println("Press Enter to continue...");
-                    sc.nextLine();
-                } else {
-                    System.out.println("Reply cannot be empty. Press Enter to continue...");
+            switch (choice) {
+                case "1" -> {
+                    System.out.println("\nEnter your reply:");
+                    String reply = sc.nextLine();
+                    if (!reply.trim().isEmpty()) {
+                        // Add reply to the enquiry
+                        enquiryControl.addReply(enquiry, reply, currentUser);
+                        System.out.println("Reply submitted successfully!");
+                        System.out.println("Press Enter to continue...");
+                        sc.nextLine();
+                    } else {
+                        System.out.println("Reply cannot be empty. Press Enter to continue...");
+                        sc.nextLine();
+                    }
+                }
+                case "2" -> {
+                    break OUTER;
+                }
+                default -> {
+                    System.out.println("Invalid choice. Press Enter to continue.");
                     sc.nextLine();
                 }
-            } else if (choice.equals("2")) {
-                break;
-            } else {
-                System.out.println("Invalid choice. Press Enter to continue.");
-                sc.nextLine();
             }
         }
     }

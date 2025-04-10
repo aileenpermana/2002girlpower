@@ -6,10 +6,10 @@ import java.io.*;
 import java.util.Scanner;
 
 public class RegistrationControl {
-    private String name;
-    private String nric;
-    private String password;
-    private int age;
+    private final String name;
+    private final String nric;
+    private final String password;
+    private final int age;
     private String maritalStatus;
     
     // Constructor
