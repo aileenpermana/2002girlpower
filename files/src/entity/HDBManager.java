@@ -1,6 +1,5 @@
 package entity;
 
-import control.ProjectControl;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -67,10 +66,10 @@ public class HDBManager extends User implements ProjectManagement {
      * Create a new BTO project
      * Implements ProjectManagement interface method
      * @param details map containing project details
-     * @return true if creation was successful, false otherwise
+     * @return the created project or null if creation fails
      */
     @Override
-    public boolean createProject(Map<String, Object> details) {
+    public Project createProject(Map<String, Object> details) {
         // Extract project details
         String projectName = (String) details.get("projectName");
         String neighborhood = (String) details.get("neighborhood");
@@ -80,7 +79,7 @@ public class HDBManager extends User implements ProjectManagement {
         
         // Check if manager is already managing a project in the same period
         if (isManagingProject(openDate, closeDate)) {
-            return false;
+            return null;
         }
         
         // Create flat type units map
@@ -106,9 +105,7 @@ public class HDBManager extends User implements ProjectManagement {
         // Add to managing projects
         managingProjects.add(project);
         
-        // Save to database via Project Control
-        ProjectControl projectControl = new ProjectControl();
-        return projectControl.addProject(project);
+        return project;
     }
     
     /**
@@ -117,9 +114,10 @@ public class HDBManager extends User implements ProjectManagement {
      * @return a generated project ID
      */
     private String generateProjectID(String projectName) {
-        // Simple algorithm: first 3 characters of project name + timestamp
+        // Simple algorithm: first 3 characters of project name + manager ID part + timestamp
         String prefix = projectName.substring(0, Math.min(3, projectName.length())).toUpperCase();
-        return prefix + System.currentTimeMillis() % 10000;
+        String managerPart = this.managerID.substring(Math.max(0, this.managerID.length() - 4));
+        return prefix + managerPart + System.currentTimeMillis() % 10000;
     }
     
     /**
@@ -165,9 +163,7 @@ public class HDBManager extends User implements ProjectManagement {
             project.setOfficerSlots(officerSlots);
         }
         
-        // Save changes via Project Control
-        ProjectControl projectControl = new ProjectControl();
-        return projectControl.updateProject(project);
+        return true;
     }
     
     /**
@@ -186,9 +182,7 @@ public class HDBManager extends User implements ProjectManagement {
         // Remove from managing projects
         managingProjects.remove(project);
         
-        // Delete via Project Control
-        ProjectControl projectControl = new ProjectControl();
-        return projectControl.deleteProject(project);
+        return true;
     }
     
     /**
@@ -200,12 +194,14 @@ public class HDBManager extends User implements ProjectManagement {
      */
     @Override
     public boolean toggleVisibility(Project project, boolean visible) {
+        // Check if manager is managing this project
+        if (!managingProjects.contains(project)) {
+            return false;
+        }
         
         project.setVisible(visible);
         
-        // Save changes via Project Control
-        ProjectControl projectControl = new ProjectControl();
-        return projectControl.updateProject(project);
+        return true;
     }
     
     /**
@@ -229,7 +225,7 @@ public class HDBManager extends User implements ProjectManagement {
             return false;
         }
         
-        // Check if there are available slots
+        // Check if there are available slots for approval
         if (approve && project.getAvailableOfficerSlots() <= 0) {
             return false;
         }
@@ -239,10 +235,6 @@ public class HDBManager extends User implements ProjectManagement {
             boolean success = project.addOfficer(officer);
             if (success) {
                 officer.addHandlingProject(project);
-                
-                // Save changes via Project Control
-                ProjectControl projectControl = new ProjectControl();
-                projectControl.updateProject(project);
                 return true;
             }
         } else {
@@ -276,9 +268,8 @@ public class HDBManager extends User implements ProjectManagement {
             
             // If the application was successful or booked, increment available units
             if (currentStatus == ApplicationStatus.SUCCESSFUL || currentStatus == ApplicationStatus.BOOKED) {
-                // In a real system, you would determine the flat type from the application
-                // For now, we'll use a placeholder
-                FlatType flatType = FlatType.TWO_ROOM; // Placeholder
+                // Determine the flat type from the application
+                FlatType flatType = determineRequestedFlatType(application);
                 project.incrementAvailableUnits(flatType);
                 
                 // If flat was booked, free it
@@ -289,14 +280,33 @@ public class HDBManager extends User implements ProjectManagement {
                         application.setBookedFlat(null);
                     }
                 }
-                
-                // Save changes via Project Control
-                ProjectControl projectControl = new ProjectControl();
-                projectControl.updateProject(project);
             }
         }
         
         return true;
+    }
+    
+    /**
+     * Determine the flat type requested by an applicant
+     * @param application the application
+     * @return the requested flat type
+     */
+    private FlatType determineRequestedFlatType(Application application) {
+        Applicant applicant = application.getApplicant();
+        
+        // If the application already has a booked flat, use its type
+        if (application.getBookedFlat() != null) {
+            return application.getBookedFlat().getType();
+        }
+        
+        // Singles can only apply for 2-Room
+        if (applicant.getMaritalStatus() == MaritalStatus.SINGLE) {
+            return FlatType.TWO_ROOM;
+        } 
+        
+        // For married couples, use 3-Room if available in the project
+        Project project = application.getProject();
+        return project.hasFlatType(FlatType.THREE_ROOM) ? FlatType.THREE_ROOM : FlatType.TWO_ROOM;
     }
     
     /**
@@ -308,5 +318,96 @@ public class HDBManager extends User implements ProjectManagement {
         if (!managingProjects.contains(project)) {
             managingProjects.add(project);
         }
+    }
+    
+    /**
+     * Generate a report based on application data and filters
+     * @param applications list of applications
+     * @param filters filtering criteria
+     * @return a Report object
+     */
+    public Report generateReport(List<Application> applications, Map<String, Object> filters) {
+        // Filter applications according to criteria
+        List<Application> filteredApps = applyFilters(applications, filters);
+        
+        // Create and configure the report
+        Report report = new Report();
+        report.setReportID("RPT-" + getManagerID() + "-" + System.currentTimeMillis() % 10000);
+        report.setApplications(filteredApps);
+        report.setGenerationDate(new Date());
+        report.setCriteria(new HashMap<>(filters));
+        
+        return report;
+    }
+    
+    /**
+     * Apply filters to a list of applications
+     * @param applications the applications to filter
+     * @param filters the filtering criteria
+     * @return filtered list of applications
+     */
+    private List<Application> applyFilters(List<Application> applications, Map<String, Object> filters) {
+        if (filters == null || filters.isEmpty()) {
+            return new ArrayList<>(applications);
+        }
+        
+        List<Application> result = new ArrayList<>(applications);
+        
+        // Filter by marital status
+        if (filters.containsKey("maritalStatus")) {
+            String maritalStatusStr = (String) filters.get("maritalStatus");
+            MaritalStatus status = MaritalStatus.fromString(maritalStatusStr);
+            
+            if (status != null) {
+                result.removeIf(app -> app.getApplicant().getMaritalStatus() != status);
+            }
+        }
+        
+        // Filter by age range
+        if (filters.containsKey("minAge")) {
+            int minAge = (int) filters.get("minAge");
+            result.removeIf(app -> app.getApplicant().getAge() < minAge);
+        }
+        
+        if (filters.containsKey("maxAge")) {
+            int maxAge = (int) filters.get("maxAge");
+            result.removeIf(app -> app.getApplicant().getAge() > maxAge);
+        }
+        
+        // Filter by application status
+        if (filters.containsKey("status")) {
+            String statusStr = (String) filters.get("status");
+            try {
+                ApplicationStatus status = ApplicationStatus.valueOf(statusStr.toUpperCase());
+                result.removeIf(app -> app.getStatus() != status);
+            } catch (IllegalArgumentException e) {
+                // Invalid status, ignore this filter
+            }
+        }
+        
+        // Filter by flat type (for booked applications)
+        if (filters.containsKey("flatType")) {
+            String flatTypeStr = (String) filters.get("flatType");
+            FlatType flatType = FlatType.fromString(flatTypeStr);
+            
+            if (flatType != null) {
+                result.removeIf(app -> {
+                    Flat bookedFlat = app.getBookedFlat();
+                    return bookedFlat == null || bookedFlat.getType() != flatType;
+                });
+            }
+        }
+        
+        return result;
+    }
+    
+    @Override
+    public String toString() {
+        return "HDBManager{" +
+                "managerID='" + managerID + '\'' +
+                ", name='" + getName() + '\'' +
+                ", NRIC='" + getNRIC() + '\'' +
+                ", managingProjects=" + managingProjects.size() +
+                '}';
     }
 }

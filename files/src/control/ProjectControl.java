@@ -19,7 +19,6 @@ public class ProjectControl {
      */
     public ProjectControl() {
         this.dataStorage = ProjectDataManager.getInstance();
-
     }
     
     /**
@@ -47,6 +46,15 @@ public class ProjectControl {
         return getAllProjects().stream()
                 .filter(project -> project.isVisible() && project.checkEligibility(user))
                 .collect(Collectors.toList());
+    }
+    
+    /**
+     * Get visible projects for a specific user with role-based visibility rules
+     * @param user the user
+     * @return list of visible projects
+     */
+    public List<Project> getVisibleProjectsForUser(User user) {
+        return getVisibleProjectsForUser(user, null);
     }
     
     /**
@@ -121,7 +129,66 @@ public class ProjectControl {
             }
         }
         
+        // Sort filter
+        if (filters.containsKey("sortBy")) {
+            String sortOption = (String) filters.get("sortBy");
+            filteredProjects = sortProjects(filteredProjects, sortOption);
+        }
+        
         return filteredProjects;
+    }
+    
+    /**
+     * Sort projects by different criteria
+     * @param projects the projects to sort
+     * @param sortOption the sort option
+     * @return sorted list of projects
+     */
+    public List<Project> sortProjects(List<Project> projects, String sortOption) {
+        List<Project> sortedProjects = new ArrayList<>(projects);
+        
+        switch (sortOption) {
+            case "1": // Flat Type
+                // Sort by number of flat types
+                sortedProjects.sort(Comparator.comparing(p -> p.getFlatTypes().size()));
+                break;
+            case "2": // Neighborhood
+                sortedProjects.sort(Comparator.comparing(Project::getNeighborhood));
+                break;
+            case "3": // Price Range (placeholder - would need price data)
+                // Using project ID as placeholder
+                sortedProjects.sort(Comparator.comparing(Project::getProjectID));
+                break;
+            case "4": // Closing Date
+                sortedProjects.sort(Comparator.comparing(Project::getApplicationCloseDate));
+                break;
+            case "6": // Availability (descending)
+                sortedProjects.sort((p1, p2) -> {
+                    int p1Available = calculateTotalAvailableUnits(p1);
+                    int p2Available = calculateTotalAvailableUnits(p2);
+                    return Integer.compare(p2Available, p1Available); // Descending
+                });
+                break;
+            case "5": // Alphabetical (default)
+            default:
+                sortedProjects.sort(Comparator.comparing(Project::getProjectName));
+                break;
+        }
+        
+        return sortedProjects;
+    }
+    
+    /**
+     * Calculate total available units across all flat types
+     * @param project the project
+     * @return total available units
+     */
+    private int calculateTotalAvailableUnits(Project project) {
+        int total = 0;
+        for (FlatType type : project.getFlatTypes()) {
+            total += project.getAvailableUnitsByType(type);
+        }
+        return total;
     }
     
     /**
@@ -131,7 +198,7 @@ public class ProjectControl {
      */
     public List<Project> getProjectsByManager(HDBManager manager) {
         return getAllProjects().stream()
-                .filter(p -> p.getManagerInCharge().getNRIC().equals(manager.getNRIC()))
+                .filter(p -> p.getManagerInCharge().getManagerID().equals(manager.getManagerID()))
                 .collect(Collectors.toList());
     }
     
@@ -171,5 +238,24 @@ public class ProjectControl {
     public boolean toggleVisibility(Project project, boolean visible) {
         project.setVisible(visible);
         return updateProject(project);
+    }
+    
+    /**
+     * Create a new project ID based on project name and manager
+     * @param projectName the project name
+     * @param manager the manager creating the project
+     * @return a unique project ID
+     */
+    public String generateProjectID(String projectName, HDBManager manager) {
+        // Take first 3 characters of project name (uppercase)
+        String prefix = projectName.substring(0, Math.min(3, projectName.length())).toUpperCase();
+        
+        // Take last 4 characters of manager ID
+        String managerPart = manager.getManagerID().substring(Math.max(0, manager.getManagerID().length() - 4));
+        
+        // Add timestamp to ensure uniqueness
+        long timestamp = System.currentTimeMillis() % 10000;
+        
+        return prefix + managerPart + timestamp;
     }
 }

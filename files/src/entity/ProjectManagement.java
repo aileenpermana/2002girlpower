@@ -3,17 +3,17 @@ package entity;
 import java.util.Map;
 
 /**
- * Defines operations for a project manager
+ * Defines operations for project management
  * Demonstrates Interface Segregation Principle by providing
- * focused interfaces for managing projects
+ * focused operations related only to project management
  */
 public interface ProjectManagement {
     /**
      * Create a new project with the given details
      * @param details map containing project details
-     * @return true if creation was successful, false otherwise
+     * @return the created project, or null if creation failed
      */
-    boolean createProject(Map<String, Object> details);
+    Project createProject(Map<String, Object> details);
     
     /**
      * Edit an existing project
