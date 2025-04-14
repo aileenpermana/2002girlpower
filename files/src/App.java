@@ -2,16 +2,26 @@ import boundary.ApplicantUI;
 import boundary.LoginUI;
 import boundary.ManagerUI;
 import boundary.OfficerUI;
+import control.ApplicationControl;
+import control.EnquiryControl;
+import control.HDBManagerControl;
+import control.HDBOfficerControl;
+import control.ProjectControl;
+import control.ReportControl;
 import entity.Applicant;
 import entity.HDBManager;
 import entity.HDBOfficer;
 import entity.User;
-import utils.ProjectFileManager;
+import java.util.Scanner;
+import utils.ProjectDataManager;
 
 /**
  * Main application class for the BTO Management System.
+ * Demonstrates the use of centralized system initialization and routing.
  */
 public class App {
+    private static Scanner scanner;
+    
     /**
      * Clears the console screen.
      */
@@ -32,14 +42,27 @@ public class App {
     }
     
     /**
-     * Initialize application data
+     * Initialize application data and control objects
      */
     public static void initializeData() {
         try {
             System.out.println("Initializing application data...");
+            
+            // Initialize project data storage
+            ProjectDataManager projectDataManager = ProjectDataManager.getInstance();
+            
+            // Initialize control classes
+            ProjectControl projectControl = new ProjectControl(projectDataManager);
+            ApplicationControl applicationControl = new ApplicationControl();
+            HDBManagerControl managerControl = new HDBManagerControl();
+            HDBOfficerControl officerControl = new HDBOfficerControl();
+            EnquiryControl enquiryControl = new EnquiryControl();
+            ReportControl reportControl = new ReportControl();
+            
             // Initialize project data from CSV
-            ProjectFileManager projectFileManager = ProjectFileManager.getInstance();
+            ProjectDataManager projectFileManager = ProjectDataManager.getInstance();
             projectFileManager.loadInitialProjectData();
+            
             System.out.println("Data initialization complete.");
         } catch (Exception e) {
             System.out.println("Error initializing data: " + e.getMessage());
@@ -48,11 +71,28 @@ public class App {
     }
     
     /**
+     * Display initial header for the application
+     */
+    private static void displayHeader() {
+        clearScreen();
+        System.out.println("=====================================================");
+        System.out.println("             BTO MANAGEMENT SYSTEM                  ");
+        System.out.println("=====================================================");
+        System.out.println("      Housing & Development Board of Singapore      ");
+        System.out.println("=====================================================");
+        System.out.println();
+    }
+    
+    /**
      * Main method to start the application.
      * @param args command line arguments
      */
     public static void main(String[] args) {
-        // Display welcome message
+        // Initialize scanner for system-wide use
+        scanner = new Scanner(System.in);
+        
+        // Display welcome header
+        displayHeader();
         System.out.println("Starting BTO Management System...");
         
         // Initialize application data
@@ -87,8 +127,11 @@ public class App {
         
         // Close resources
         loginUI.close();
+        if (scanner != null) {
+            scanner.close();
+        }
         
         // Display exit message
-        System.out.println("Thank you for using BTO Management System. Goodbye!");
+        System.out.println("\nThank you for using BTO Management System. Goodbye!");
     }
 }

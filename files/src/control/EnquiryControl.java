@@ -3,9 +3,11 @@ package control;
 import entity.*;
 import java.io.*;
 import java.util.*;
+import java.text.SimpleDateFormat;
 
 /**
- * Controls operations related to Enquiries in the BTO system.
+ * Enhanced control class for managing enquiries in the BTO system.
+ * Demonstrates Single Responsibility Principle by focusing only on enquiry operations.
  */
 public class EnquiryControl {
     private static final String ENQUIRIES_FILE = "files/resources/EnquiryList.csv";
@@ -16,6 +18,14 @@ public class EnquiryControl {
      */
     public EnquiryControl() {
         this.enquiries = loadEnquiries();
+    }
+    
+    /**
+     * Get all enquiries in the system
+     * @return list of all enquiries
+     */
+    public List<Enquiry> getAllEnquiries() {
+        return new ArrayList<>(enquiries);
     }
     
     /**
@@ -60,16 +70,16 @@ public class EnquiryControl {
      * @return the created enquiry, or null if submission failed
      */
     public Enquiry submitEnquiry(Applicant applicant, Project project, String content) {
-        // Create new enquiry
-        Enquiry enquiry = new Enquiry();
+        // Validate input
+        if (content == null || content.trim().isEmpty()) {
+            return null;
+        }
         
-        // Set basic properties
-        enquiry.setEnquiryID(generateEnquiryID(applicant, project));
-        enquiry.setApplicant(applicant);
-        enquiry.setProject(project);
-        enquiry.setContent(content);
-        enquiry.setSubmissionDate(new Date());
-        enquiry.setReplies(new ArrayList<>());
+        // Generate enquiry ID
+        String enquiryID = generateEnquiryID(applicant, project);
+        
+        // Create new enquiry
+        Enquiry enquiry = new Enquiry(enquiryID, applicant, project, content, new Date());
         
         // Add to list
         enquiries.add(enquiry);
@@ -83,19 +93,40 @@ public class EnquiryControl {
     }
     
     /**
+     * Generate an enquiry ID based on the applicant and project
+     * @param applicant the applicant
+     * @param project the project
+     * @return a unique enquiry ID
+     */
+    private String generateEnquiryID(Applicant applicant, Project project) {
+        // Simple algorithm to generate an enquiry ID
+        String prefix = "ENQ";
+        String applicantPart = applicant.getNRIC().substring(1, 5);
+        String projectPart = project.getProjectID().substring(0, Math.min(3, project.getProjectID().length()));
+        String timestamp = Long.toString(System.currentTimeMillis() % 100000);
+        
+        return prefix + "-" + applicantPart + "-" + projectPart + "-" + timestamp;
+    }
+    
+    /**
      * Edit an existing enquiry
      * @param enquiry the enquiry to edit
      * @param newContent the new content
      * @return true if edit was successful, false otherwise
      */
     public boolean editEnquiry(Enquiry enquiry, String newContent) {
+        // Validate input
+        if (newContent == null || newContent.trim().isEmpty()) {
+            return false;
+        }
+        
         // Check if enquiry exists
         if (!enquiries.contains(enquiry)) {
             return false;
         }
         
         // Check if enquiry has replies (can't edit if it does)
-        if (!enquiry.getReplies().isEmpty()) {
+        if (enquiry.getReplies() != null && !enquiry.getReplies().isEmpty()) {
             return false;
         }
         
@@ -118,7 +149,7 @@ public class EnquiryControl {
         }
         
         // Check if enquiry has replies (can't delete if it does)
-        if (!enquiry.getReplies().isEmpty()) {
+        if (enquiry.getReplies() != null && !enquiry.getReplies().isEmpty()) {
             return false;
         }
         
@@ -137,31 +168,26 @@ public class EnquiryControl {
      * @return true if reply was added successfully, false otherwise
      */
     public boolean addReply(Enquiry enquiry, String reply, User responder) {
+        // Validate input
+        if (reply == null || reply.trim().isEmpty()) {
+            return false;
+        }
+        
         // Check if enquiry exists
         if (!enquiries.contains(enquiry)) {
             return false;
         }
         
         // Format reply with responder info
-        String formattedReply = responder.getName() + " (" + responder.getRole() + "): " + reply;
+        SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy HH:mm");
+        String formattedReply = responder.getName() + " (" + responder.getRole() + ") [" + 
+                             sdf.format(new Date()) + "]: " + reply;
         
         // Add reply
-        enquiry.getReplies().add(formattedReply);
+        enquiry.addReply(formattedReply);
         
         // Save to file
         return saveEnquiries();
-    }
-    
-    /**
-     * Generate an enquiry ID
-     * @param applicant the applicant
-     * @param project the project
-     * @return a unique enquiry ID
-     */
-    private String generateEnquiryID(Applicant applicant, Project project) {
-        // Simple algorithm to generate an enquiry ID
-        // In a real system, you would use a more robust method
-        return "ENQ-" + applicant.getNRIC().substring(1, 5) + "-" + project.getProjectID().substring(0, 3) + "-" + System.currentTimeMillis() % 1000;
     }
     
     /**
@@ -181,24 +207,23 @@ public class EnquiryControl {
                 String line = fileScanner.nextLine().trim();
                 if (line.isEmpty()) continue;
                 
-                String[] values = line.split(",", 6); // Limit to 6 to handle commas in content and replies
-                if (values.length < 5) continue; // Invalid line
+                // Fix for handling commas in content and replies
+                List<String> values = parseCSVLine(line);
+                if (values.size() < 5) continue; // Invalid line
                 
                 // Parse enquiry data
                 try {
-                    String enquiryID = values[0].trim();
-                    String applicantNRIC = values[1].trim();
-                    String projectID = values[2].trim();
-                    long submissionDate = Long.parseLong(values[3].trim());
-                    String content = values[4].trim();
+                    String enquiryID = values.get(0).trim();
+                    String applicantNRIC = values.get(1).trim();
+                    String projectID = values.get(2).trim();
+                    long submissionDate = Long.parseLong(values.get(3).trim());
+                    String content = values.get(4).trim();
                     
                     // Parse replies (if any)
                     List<String> replies = new ArrayList<>();
-                    if (values.length > 5 && !values[5].trim().isEmpty()) {
-                        String[] repliesArr = values[5].split("\\|");
-                        for (String reply : repliesArr) {
-                            replies.add(reply.trim());
-                        }
+                    if (values.size() > 5 && !values.get(5).trim().isEmpty()) {
+                        String[] repliesArr = values.get(5).split("\\|");
+                        Collections.addAll(replies, repliesArr);
                     }
                     
                     // Find applicant and project (in a real system, these would come from repositories)
@@ -224,13 +249,12 @@ public class EnquiryControl {
                     );
                     
                     // Create enquiry
-                    Enquiry enquiry = new Enquiry();
-                    enquiry.setEnquiryID(enquiryID);
-                    enquiry.setApplicant(applicant);
-                    enquiry.setProject(project);
-                    enquiry.setContent(content);
-                    enquiry.setSubmissionDate(new Date(submissionDate));
-                    enquiry.setReplies(replies);
+                    Enquiry enquiry = new Enquiry(enquiryID, applicant, project, content, new Date(submissionDate));
+                    
+                    // Add replies
+                    for (String reply : replies) {
+                        enquiry.addReply(reply.trim());
+                    }
                     
                     // Add to list
                     loadedEnquiries.add(enquiry);
@@ -244,6 +268,33 @@ public class EnquiryControl {
         }
         
         return loadedEnquiries;
+    }
+    
+    /**
+     * Parse a CSV line, handling commas in quoted fields
+     * @param line the CSV line
+     * @return list of field values
+     */
+    private List<String> parseCSVLine(String line) {
+        List<String> result = new ArrayList<>();
+        StringBuilder currentField = new StringBuilder();
+        boolean inQuotes = false;
+        
+        for (char c : line.toCharArray()) {
+            if (c == '"') {
+                inQuotes = !inQuotes;
+            } else if (c == ',' && !inQuotes) {
+                result.add(currentField.toString());
+                currentField = new StringBuilder();
+            } else {
+                currentField.append(c);
+            }
+        }
+        
+        // Add the last field
+        result.add(currentField.toString());
+        
+        return result;
     }
     
     /**
@@ -264,20 +315,27 @@ public class EnquiryControl {
                 
                 // Write enquiries
                 for (Enquiry enquiry : enquiries) {
+                    // Handle commas in content by quoting if necessary
+                    String content = enquiry.getContent();
+                    if (content.contains(",")) {
+                        content = "\"" + content + "\"";
+                    }
+                    
                     writer.print(
                         enquiry.getEnquiryID() + "," +
                         enquiry.getApplicant().getNRIC() + "," +
                         enquiry.getProject().getProjectID() + "," +
                         enquiry.getSubmissionDate().getTime() + "," +
-                        enquiry.getContent()
+                        content
                     );
                     
                     // Add replies if any
-                    if (!enquiry.getReplies().isEmpty()) {
+                    List<String> replies = enquiry.getReplies();
+                    if (replies != null && !replies.isEmpty()) {
                         writer.print(",");
-                        for (int i = 0; i < enquiry.getReplies().size(); i++) {
+                        for (int i = 0; i < replies.size(); i++) {
                             if (i > 0) writer.print("|");
-                            writer.print(enquiry.getReplies().get(i));
+                            writer.print(replies.get(i).replace(",", "\\,").replace("|", "\\|"));
                         }
                     }
                     

@@ -2,20 +2,32 @@ package control;
 
 import entity.*;
 import java.util.*;
-import utils.ProjectFileManager;
+import java.util.stream.Collectors;
+import utils.DataStorage;
+import utils.ProjectDataManager;
 
 /**
  * Control class for managing Project operations in the BTO system.
- * Demonstrates the use of the Controller pattern in MVC architecture.
+ * Demonstrates the use of Dependency Inversion Principle by depending on
+ * DataStorage interface rather than concrete implementation
  */
 public class ProjectControl {
-    private ProjectFileManager fileManager;
+    private final DataStorage<Project> dataStorage;
     
     /**
-     * Constructor for ProjectControl
+     * Constructor with default storage
      */
     public ProjectControl() {
-        this.fileManager = ProjectFileManager.getInstance();
+        this.dataStorage = ProjectDataManager.getInstance();
+
+    }
+    
+    /**
+     * Constructor with custom storage (for testing or different storage methods)
+     * Demonstrates Dependency Inversion Principle
+     */
+    public ProjectControl(DataStorage<Project> storage) {
+        this.dataStorage = storage;
     }
     
     /**
@@ -23,7 +35,7 @@ public class ProjectControl {
      * @return list of all projects
      */
     public List<Project> getAllProjects() {
-        return fileManager.readAllProjects();
+        return dataStorage.readAll();
     }
     
     /**
@@ -32,20 +44,13 @@ public class ProjectControl {
      * @return list of projects the user is eligible for
      */
     public List<Project> getEligibleProjects(User user) {
-        List<Project> allProjects = getAllProjects();
-        List<Project> eligibleProjects = new ArrayList<>();
-        
-        for (Project project : allProjects) {
-            if (project.isVisible() && project.checkEligibility(user)) {
-                eligibleProjects.add(project);
-            }
-        }
-        
-        return eligibleProjects;
+        return getAllProjects().stream()
+                .filter(project -> project.isVisible() && project.checkEligibility(user))
+                .collect(Collectors.toList());
     }
     
     /**
-     * Get visible projects for a user
+     * Get visible projects for a user with optional filters
      * @param user the user
      * @param filters optional filters
      * @return list of visible projects
@@ -61,7 +66,7 @@ public class ProjectControl {
                 continue;
             }
             
-            // Officers can see projects they are handling, regardless of visibility
+            // Officers can see projects they are handling regardless of visibility
             if (user instanceof HDBOfficer) {
                 HDBOfficer officer = (HDBOfficer) user;
                 if (officer.isHandlingProject(project)) {
@@ -101,11 +106,20 @@ public class ProjectControl {
         
         // Flat type filter
         if (filters.containsKey("flatType")) {
-            FlatType flatType = (FlatType) filters.get("flatType");
-            filteredProjects.removeIf(p -> !p.getFlatTypes().contains(flatType));
+            String flatTypeStr = (String) filters.get("flatType");
+            FlatType flatType = null;
+            
+            if (flatTypeStr.equalsIgnoreCase("2-Room")) {
+                flatType = FlatType.TWO_ROOM;
+            } else if (flatTypeStr.equalsIgnoreCase("3-Room")) {
+                flatType = FlatType.THREE_ROOM;
+            }
+            
+            if (flatType != null) {
+                FlatType finalFlatType = flatType;
+                filteredProjects.removeIf(p -> !p.hasFlatType(finalFlatType));
+            }
         }
-        
-        // Add more filters as needed
         
         return filteredProjects;
     }
@@ -116,16 +130,9 @@ public class ProjectControl {
      * @return list of projects created by the manager
      */
     public List<Project> getProjectsByManager(HDBManager manager) {
-        List<Project> allProjects = getAllProjects();
-        List<Project> managerProjects = new ArrayList<>();
-        
-        for (Project project : allProjects) {
-            if (project.getManagerInCharge().getNRIC().equals(manager.getNRIC())) {
-                managerProjects.add(project);
-            }
-        }
-        
-        return managerProjects;
+        return getAllProjects().stream()
+                .filter(p -> p.getManagerInCharge().getNRIC().equals(manager.getNRIC()))
+                .collect(Collectors.toList());
     }
     
     /**
@@ -134,7 +141,7 @@ public class ProjectControl {
      * @return true if addition was successful, false otherwise
      */
     public boolean addProject(Project project) {
-        return fileManager.addProject(project);
+        return dataStorage.save(project);
     }
     
     /**
@@ -143,7 +150,7 @@ public class ProjectControl {
      * @return true if update was successful, false otherwise
      */
     public boolean updateProject(Project project) {
-        return fileManager.updateProject(project);
+        return dataStorage.update(project);
     }
     
     /**
@@ -152,7 +159,7 @@ public class ProjectControl {
      * @return true if deletion was successful, false otherwise
      */
     public boolean deleteProject(Project project) {
-        return fileManager.deleteProject(project);
+        return dataStorage.delete(project);
     }
     
     /**

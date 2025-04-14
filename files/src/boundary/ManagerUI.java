@@ -3,26 +3,25 @@ package boundary;
 import control.ApplicationControl;
 import control.EnquiryControl;
 import control.HDBManagerControl;
-import control.ProjectControl;
 import control.ReportControl;
 import entity.*;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.function.Predicate;
 import utils.ScreenUtil;
 
 /**
  * UI class for HDB Manager operations in the BTO Management System.
+ * Demonstrates the Boundary pattern in MVC architecture.
  */
 public class ManagerUI {
-    private HDBManager currentUser;
-    private Scanner sc;
-    private ProjectControl projectControl;
-    private ApplicationControl applicationControl;
-    private HDBManagerControl managerControl;
-    private EnquiryControl enquiryControl;
-    private ReportControl reportControl;
-    
+    private final HDBManager currentUser;
+    private final Scanner sc;
+    private final HDBManagerControl managerControl;
+    private final ApplicationControl applicationControl;
+    private final EnquiryControl enquiryControl;
+    private final ReportControl reportControl;
     
     /**
      * Constructor for ManagerUI
@@ -31,9 +30,8 @@ public class ManagerUI {
     public ManagerUI(HDBManager user) {
         this.currentUser = user;
         this.sc = new Scanner(System.in);
-        this.projectControl = new ProjectControl();
-        this.applicationControl = new ApplicationControl();
         this.managerControl = new HDBManagerControl();
+        this.applicationControl = new ApplicationControl();
         this.enquiryControl = new EnquiryControl();
         this.reportControl = new ReportControl();
     }
@@ -150,56 +148,22 @@ public class ManagerUI {
         System.out.println("\n===== Create New Project =====");
         
         try {
-            // Get project details
-            System.out.print("Project Name: ");
-            String projectName = sc.nextLine();
+            // Get project details using input validation
+            String projectName = getValidInput("Project Name: ", 
+                input -> !input.trim().isEmpty(), 
+                "Project name cannot be empty.");
             
-            if (projectName.trim().isEmpty()) {
-                System.out.println("Project name cannot be empty. Press Enter to continue.");
-                sc.nextLine();
-                return;
-            }
+            String neighborhood = getValidInput("Neighborhood (e.g., Yishun, Boon Lay): ", 
+                input -> !input.trim().isEmpty(), 
+                "Neighborhood cannot be empty.");
             
-            System.out.print("Neighborhood (e.g., Yishun, Boon Lay): ");
-            String neighborhood = sc.nextLine();
+            int twoRoomUnits = getValidIntInput("Number of 2-Room units: ", 
+                input -> input >= 0, 
+                "Number of units cannot be negative.");
             
-            if (neighborhood.trim().isEmpty()) {
-                System.out.println("Neighborhood cannot be empty. Press Enter to continue.");
-                sc.nextLine();
-                return;
-            }
-            
-            // Get number of 2-Room units
-            System.out.print("Number of 2-Room units: ");
-            int twoRoomUnits;
-            try {
-                twoRoomUnits = Integer.parseInt(sc.nextLine());
-                if (twoRoomUnits < 0) {
-                    System.out.println("Number of units cannot be negative. Press Enter to continue.");
-                    sc.nextLine();
-                    return;
-                }
-            } catch (NumberFormatException e) {
-                System.out.println("Invalid input. Please enter a number. Press Enter to continue.");
-                sc.nextLine();
-                return;
-            }
-            
-            // Get number of 3-Room units
-            System.out.print("Number of 3-Room units: ");
-            int threeRoomUnits;
-            try {
-                threeRoomUnits = Integer.parseInt(sc.nextLine());
-                if (threeRoomUnits < 0) {
-                    System.out.println("Number of units cannot be negative. Press Enter to continue.");
-                    sc.nextLine();
-                    return;
-                }
-            } catch (NumberFormatException e) {
-                System.out.println("Invalid input. Please enter a number. Press Enter to continue.");
-                sc.nextLine();
-                return;
-            }
+            int threeRoomUnits = getValidIntInput("Number of 3-Room units: ", 
+                input -> input >= 0, 
+                "Number of units cannot be negative.");
             
             // Ensure at least one type of unit is available
             if (twoRoomUnits == 0 && threeRoomUnits == 0) {
@@ -210,28 +174,8 @@ public class ManagerUI {
             
             // Get application dates
             SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy");
-            
-            System.out.print("Application Opening Date (dd/MM/yyyy): ");
-            String openDateStr = sc.nextLine();
-            Date openDate;
-            try {
-                openDate = dateFormat.parse(openDateStr);
-            } catch (ParseException e) {
-                System.out.println("Invalid date format. Please use dd/MM/yyyy. Press Enter to continue.");
-                sc.nextLine();
-                return;
-            }
-            
-            System.out.print("Application Closing Date (dd/MM/yyyy): ");
-            String closeDateStr = sc.nextLine();
-            Date closeDate;
-            try {
-                closeDate = dateFormat.parse(closeDateStr);
-            } catch (ParseException e) {
-                System.out.println("Invalid date format. Please use dd/MM/yyyy. Press Enter to continue.");
-                sc.nextLine();
-                return;
-            }
+            Date openDate = getValidDateInput("Application Opening Date (dd/MM/yyyy): ", dateFormat);
+            Date closeDate = getValidDateInput("Application Closing Date (dd/MM/yyyy): ", dateFormat);
             
             // Check date validity
             if (closeDate.before(openDate)) {
@@ -240,21 +184,9 @@ public class ManagerUI {
                 return;
             }
             
-            // Get number of officer slots
-            System.out.print("Number of HDB Officer slots (max 10): ");
-            int officerSlots;
-            try {
-                officerSlots = Integer.parseInt(sc.nextLine());
-                if (officerSlots < 1 || officerSlots > 10) {
-                    System.out.println("Number of slots must be between 1 and 10. Press Enter to continue.");
-                    sc.nextLine();
-                    return;
-                }
-            } catch (NumberFormatException e) {
-                System.out.println("Invalid input. Please enter a number. Press Enter to continue.");
-                sc.nextLine();
-                return;
-            }
+            int officerSlots = getValidIntInput("Number of HDB Officer slots (max 10): ", 
+                input -> input >= 1 && input <= 10, 
+                "Number of slots must be between 1 and 10.");
             
             // Create project details map
             Map<String, Object> projectDetails = new HashMap<>();
@@ -267,7 +199,7 @@ public class ManagerUI {
             projectDetails.put("officerSlots", officerSlots);
             
             // Create the project
-            Project newProject = currentUser.createProject(projectDetails);
+            Project newProject = managerControl.createProject(currentUser, projectDetails);
             
             if (newProject != null) {
                 System.out.println("\nProject created successfully!");
@@ -308,22 +240,12 @@ public class ManagerUI {
             System.out.println((i + 1) + ". " + managedProjects.get(i).getProjectName());
         }
         
-        System.out.print("\nEnter project number (0 to cancel): ");
-        int projectChoice;
-        try {
-            projectChoice = Integer.parseInt(sc.nextLine());
-            if (projectChoice == 0) {
-                return;
-            }
-            
-            if (projectChoice < 1 || projectChoice > managedProjects.size()) {
-                System.out.println("Invalid project number. Press Enter to continue.");
-                sc.nextLine();
-                return;
-            }
-        } catch (NumberFormatException e) {
-            System.out.println("Invalid input. Press Enter to continue.");
-            sc.nextLine();
+        // Get project selection with validation
+        int projectChoice = getValidIntInput("\nEnter project number (0 to cancel): ", 
+            input -> input >= 0 && input <= managedProjects.size(), 
+            "Invalid project number.");
+        
+        if (projectChoice == 0) {
             return;
         }
         
@@ -342,22 +264,12 @@ public class ManagerUI {
         System.out.println("6. Closing Date: " + dateFormat.format(selectedProject.getApplicationCloseDate()));
         System.out.println("7. Officer Slots: " + (selectedProject.getAvailableOfficerSlots() + selectedProject.getOfficers().size()));
         
-        System.out.print("\nEnter the number of the detail to edit (0 to cancel): ");
-        int detailChoice;
-        try {
-            detailChoice = Integer.parseInt(sc.nextLine());
-            if (detailChoice == 0) {
-                return;
-            }
-            
-            if (detailChoice < 1 || detailChoice > 7) {
-                System.out.println("Invalid choice. Press Enter to continue.");
-                sc.nextLine();
-                return;
-            }
-        } catch (NumberFormatException e) {
-            System.out.println("Invalid input. Press Enter to continue.");
-            sc.nextLine();
+        // Get detail selection with validation
+        int detailChoice = getValidIntInput("\nEnter the number of the detail to edit (0 to cancel): ", 
+            input -> input >= 0 && input <= 7, 
+            "Invalid choice.");
+        
+        if (detailChoice == 0) {
             return;
         }
         
@@ -367,73 +279,60 @@ public class ManagerUI {
         // Get and update the selected detail
         switch (detailChoice) {
             case 1: // Project Name
-                System.out.print("Enter new Project Name: ");
-                String newName = sc.nextLine();
+                String newName = getInputWithPrompt("Enter new Project Name: ");
                 if (!newName.trim().isEmpty()) {
                     updatedDetails.put("projectName", newName);
                 }
                 break;
             case 2: // Neighborhood
-                System.out.print("Enter new Neighborhood: ");
-                String newNeighborhood = sc.nextLine();
+                String newNeighborhood = getInputWithPrompt("Enter new Neighborhood: ");
                 if (!newNeighborhood.trim().isEmpty()) {
                     updatedDetails.put("neighborhood", newNeighborhood);
                 }
                 break;
             case 3: // 2-Room Units
-                System.out.print("Enter new number of 2-Room Units: ");
                 try {
-                    int newTwoRoomUnits = Integer.parseInt(sc.nextLine());
-                    if (newTwoRoomUnits >= 0) {
-                        updatedDetails.put("twoRoomUnits", newTwoRoomUnits);
-                    } else {
-                        System.out.println("Number cannot be negative. Update cancelled.");
-                    }
-                } catch (NumberFormatException e) {
+                    int newTwoRoomUnits = getValidIntInput("Enter new number of 2-Room Units: ", 
+                        input -> input >= 0, 
+                        "Number cannot be negative.");
+                    updatedDetails.put("twoRoomUnits", newTwoRoomUnits);
+                } catch (Exception e) {
                     System.out.println("Invalid input. Update cancelled.");
                 }
                 break;
             case 4: // 3-Room Units
-                System.out.print("Enter new number of 3-Room Units: ");
                 try {
-                    int newThreeRoomUnits = Integer.parseInt(sc.nextLine());
-                    if (newThreeRoomUnits >= 0) {
-                        updatedDetails.put("threeRoomUnits", newThreeRoomUnits);
-                    } else {
-                        System.out.println("Number cannot be negative. Update cancelled.");
-                    }
-                } catch (NumberFormatException e) {
+                    int newThreeRoomUnits = getValidIntInput("Enter new number of 3-Room Units: ", 
+                        input -> input >= 0, 
+                        "Number cannot be negative.");
+                    updatedDetails.put("threeRoomUnits", newThreeRoomUnits);
+                } catch (Exception e) {
                     System.out.println("Invalid input. Update cancelled.");
                 }
                 break;
             case 5: // Opening Date
-                System.out.print("Enter new Opening Date (dd/MM/yyyy): ");
                 try {
-                    Date newOpenDate = dateFormat.parse(sc.nextLine());
+                    Date newOpenDate = getValidDateInput("Enter new Opening Date (dd/MM/yyyy): ", dateFormat);
                     updatedDetails.put("openDate", newOpenDate);
-                } catch (ParseException e) {
+                } catch (Exception e) {
                     System.out.println("Invalid date format. Update cancelled.");
                 }
                 break;
             case 6: // Closing Date
-                System.out.print("Enter new Closing Date (dd/MM/yyyy): ");
                 try {
-                    Date newCloseDate = dateFormat.parse(sc.nextLine());
+                    Date newCloseDate = getValidDateInput("Enter new Closing Date (dd/MM/yyyy): ", dateFormat);
                     updatedDetails.put("closeDate", newCloseDate);
-                } catch (ParseException e) {
+                } catch (Exception e) {
                     System.out.println("Invalid date format. Update cancelled.");
                 }
                 break;
             case 7: // Officer Slots
-                System.out.print("Enter new number of Officer Slots (max 10): ");
                 try {
-                    int newOfficerSlots = Integer.parseInt(sc.nextLine());
-                    if (newOfficerSlots >= 1 && newOfficerSlots <= 10) {
-                        updatedDetails.put("officerSlots", newOfficerSlots);
-                    } else {
-                        System.out.println("Number must be between 1 and 10. Update cancelled.");
-                    }
-                } catch (NumberFormatException e) {
+                    int newOfficerSlots = getValidIntInput("Enter new number of Officer Slots (max 10): ", 
+                        input -> input >= 1 && input <= 10, 
+                        "Number must be between 1 and 10.");
+                    updatedDetails.put("officerSlots", newOfficerSlots);
+                } catch (Exception e) {
                     System.out.println("Invalid input. Update cancelled.");
                 }
                 break;
@@ -441,7 +340,7 @@ public class ManagerUI {
         
         if (!updatedDetails.isEmpty()) {
             // Apply the updates
-            boolean success = currentUser.editProject(selectedProject, updatedDetails);
+            boolean success = managerControl.editProject(currentUser, selectedProject, updatedDetails);
             
             if (success) {
                 System.out.println("Project updated successfully!");
@@ -479,22 +378,12 @@ public class ManagerUI {
             System.out.println((i + 1) + ". " + managedProjects.get(i).getProjectName());
         }
         
-        System.out.print("\nEnter project number (0 to cancel): ");
-        int projectChoice;
-        try {
-            projectChoice = Integer.parseInt(sc.nextLine());
-            if (projectChoice == 0) {
-                return;
-            }
-            
-            if (projectChoice < 1 || projectChoice > managedProjects.size()) {
-                System.out.println("Invalid project number. Press Enter to continue.");
-                sc.nextLine();
-                return;
-            }
-        } catch (NumberFormatException e) {
-            System.out.println("Invalid input. Press Enter to continue.");
-            sc.nextLine();
+        // Get project selection with validation
+        int projectChoice = getValidIntInput("\nEnter project number (0 to cancel): ", 
+            input -> input >= 0 && input <= managedProjects.size(), 
+            "Invalid project number.");
+        
+        if (projectChoice == 0) {
             return;
         }
         
@@ -506,7 +395,7 @@ public class ManagerUI {
         String confirmation = sc.nextLine();
         
         if (confirmation.equalsIgnoreCase("Y")) {
-            boolean success = currentUser.deleteProject(selectedProject);
+            boolean success = managerControl.deleteProject(currentUser, selectedProject);
             
             if (success) {
                 System.out.println("Project deleted successfully!");
@@ -546,22 +435,12 @@ public class ManagerUI {
                              (p.isVisible() ? "Visible" : "Hidden"));
         }
         
-        System.out.print("\nEnter project number to toggle visibility (0 to cancel): ");
-        int projectChoice;
-        try {
-            projectChoice = Integer.parseInt(sc.nextLine());
-            if (projectChoice == 0) {
-                return;
-            }
-            
-            if (projectChoice < 1 || projectChoice > managedProjects.size()) {
-                System.out.println("Invalid project number. Press Enter to continue.");
-                sc.nextLine();
-                return;
-            }
-        } catch (NumberFormatException e) {
-            System.out.println("Invalid input. Press Enter to continue.");
-            sc.nextLine();
+        // Get project selection with validation
+        int projectChoice = getValidIntInput("\nEnter project number to toggle visibility (0 to cancel): ", 
+            input -> input >= 0 && input <= managedProjects.size(), 
+            "Invalid project number.");
+        
+        if (projectChoice == 0) {
             return;
         }
         
@@ -569,10 +448,15 @@ public class ManagerUI {
         boolean currentVisibility = selectedProject.isVisible();
         
         // Toggle visibility
-        currentUser.toggleVisibility(selectedProject, !currentVisibility);
+        boolean success = managerControl.toggleProjectVisibility(currentUser, selectedProject, !currentVisibility);
         
-        System.out.println("\nProject '" + selectedProject.getProjectName() + "' is now " + 
-                         (selectedProject.isVisible() ? "visible" : "hidden") + " to applicants.");
+        if (success) {
+            System.out.println("\nProject '" + selectedProject.getProjectName() + "' is now " + 
+                             (selectedProject.isVisible() ? "visible" : "hidden") + " to applicants.");
+        } else {
+            System.out.println("\nFailed to toggle project visibility.");
+        }
+        
         System.out.println("Press Enter to continue...");
         sc.nextLine();
     }
@@ -617,7 +501,7 @@ public class ManagerUI {
         ScreenUtil.clearScreen();
         System.out.println("\n===== All Projects =====");
         
-        List<Project> allProjects = projectControl.getAllProjects();
+        List<Project> allProjects = managerControl.getAllProjects();
         
         if (allProjects.isEmpty()) {
             System.out.println("No projects found in the system.");
@@ -671,7 +555,7 @@ public class ManagerUI {
                             p.isVisible() ? "Visible" : "Hidden",
                             dateFormat.format(p.getApplicationCloseDate()),
                             totalUnits,
-                            truncateString(p.getManagerInCharge().getName(), 10));
+                            truncateString(p.getManagerInCharge().getManagerID(), 10));
         }
         
         System.out.println("\nOptions:");
@@ -780,22 +664,12 @@ public class ManagerUI {
                              (p.getAvailableOfficerSlots() + p.getOfficers().size()) + ")");
         }
         
-        System.out.print("\nEnter project number (0 to cancel): ");
-        int projectChoice;
-        try {
-            projectChoice = Integer.parseInt(sc.nextLine());
-            if (projectChoice == 0) {
-                return;
-            }
-            
-            if (projectChoice < 1 || projectChoice > managedProjects.size()) {
-                System.out.println("Invalid project number. Press Enter to continue.");
-                sc.nextLine();
-                return;
-            }
-        } catch (NumberFormatException e) {
-            System.out.println("Invalid input. Press Enter to continue.");
-            sc.nextLine();
+        // Get project selection with validation
+        int projectChoice = getValidIntInput("\nEnter project number (0 to cancel): ", 
+            input -> input >= 0 && input <= managedProjects.size(), 
+            "Invalid project number.");
+        
+        if (projectChoice == 0) {
             return;
         }
         
@@ -817,12 +691,7 @@ public class ManagerUI {
             System.out.println("\n===== Officer Registrations for " + selectedProject.getProjectName() + " =====");
             System.out.println("Available Slots: " + selectedProject.getAvailableOfficerSlots());
             
-            List<Map<String, Object>> pendingRegistrations = new ArrayList<>();
-            for (Map<String, Object> reg : registrations) {
-                if (reg.get("status") == RegistrationStatus.PENDING) {
-                    pendingRegistrations.add(reg);
-                }
-            }
+            List<Map<String, Object>> pendingRegistrations = getPendingRegistrations(registrations);
             
             if (pendingRegistrations.isEmpty()) {
                 System.out.println("\nNo pending officer registrations for this project.");
@@ -858,57 +727,50 @@ public class ManagerUI {
             String choice = sc.nextLine();
             
             if (choice.equals("1") || choice.equals("2")) {
-                System.out.print("Enter registration number: ");
-                try {
-                    int regIndex = Integer.parseInt(sc.nextLine()) - 1;
-                    if (regIndex < 0 || regIndex >= pendingRegistrations.size()) {
-                        System.out.println("Invalid registration number. Press Enter to continue.");
+                int regIndex = getValidIntInput("Enter registration number: ", 
+                    input -> input >= 1 && input <= pendingRegistrations.size(), 
+                    "Invalid registration number.");
+                
+                Map<String, Object> selectedReg = pendingRegistrations.get(regIndex - 1);
+                HDBOfficer officer = (HDBOfficer) selectedReg.get("officer");
+                
+                if (choice.equals("1")) {
+                    // Check if there are available slots
+                    if (selectedProject.getAvailableOfficerSlots() <= 0) {
+                        System.out.println("No available officer slots. Cannot approve registration.");
+                        System.out.println("Press Enter to continue...");
                         sc.nextLine();
                         continue;
                     }
                     
-                    Map<String, Object> selectedReg = pendingRegistrations.get(regIndex);
-                    HDBOfficer officer = (HDBOfficer) selectedReg.get("officer");
+                    // Approve registration
+                    boolean success = managerControl.processOfficerRegistration(
+                        currentUser, officer, selectedProject, true);
                     
-                    if (choice.equals("1")) {
-                        // Check if there are available slots
-                        if (selectedProject.getAvailableOfficerSlots() <= 0) {
-                            System.out.println("No available officer slots. Cannot approve registration.");
-                            System.out.println("Press Enter to continue...");
-                            sc.nextLine();
-                            continue;
-                        }
-                        
-                        // Approve registration
-                        boolean success = currentUser.processOfficerRegistration(officer, selectedProject, true);
-                        
-                        if (success) {
-                            System.out.println("Registration approved successfully!");
-                            // Update registration status
-                            selectedReg.put("status", RegistrationStatus.APPROVED);
-                        } else {
-                            System.out.println("Failed to approve registration.");
-                        }
+                    if (success) {
+                        System.out.println("Registration approved successfully!");
+                        // Update registration status
+                        selectedReg.put("status", RegistrationStatus.APPROVED);
                     } else {
-                        // Reject registration
-                        boolean success = currentUser.processOfficerRegistration(officer, selectedProject, false);
-                        
-                        if (success) {
-                            System.out.println("Registration rejected successfully!");
-                            // Update registration status
-                            selectedReg.put("status", RegistrationStatus.REJECTED);
-                        } else {
-                            System.out.println("Failed to reject registration.");
-                        }
+                        System.out.println("Failed to approve registration.");
                     }
+                } else {
+                    // Reject registration
+                    boolean success = managerControl.processOfficerRegistration(
+                        currentUser, officer, selectedProject, false);
                     
-                    System.out.println("Press Enter to continue...");
-                    sc.nextLine();
-                    
-                } catch (NumberFormatException e) {
-                    System.out.println("Invalid input. Press Enter to continue.");
-                    sc.nextLine();
+                    if (success) {
+                        System.out.println("Registration rejected successfully!");
+                        // Update registration status
+                        selectedReg.put("status", RegistrationStatus.REJECTED);
+                    } else {
+                        System.out.println("Failed to reject registration.");
+                    }
                 }
+                
+                System.out.println("Press Enter to continue...");
+                sc.nextLine();
+                
             } else if (choice.equals("3")) {
                 break;
             } else {
@@ -916,6 +778,23 @@ public class ManagerUI {
                 sc.nextLine();
             }
         }
+    }
+    
+    /**
+     * Get pending registrations from a list of registrations
+     * @param registrations the list of all registrations
+     * @return list of pending registrations
+     */
+    private List<Map<String, Object>> getPendingRegistrations(List<Map<String, Object>> registrations) {
+        List<Map<String, Object>> pendingRegistrations = new ArrayList<>();
+        
+        for (Map<String, Object> reg : registrations) {
+            if (reg.get("status") == RegistrationStatus.PENDING) {
+                pendingRegistrations.add(reg);
+            }
+        }
+        
+        return pendingRegistrations;
     }
     
     /**
@@ -941,22 +820,12 @@ public class ManagerUI {
             System.out.println((i + 1) + ". " + managedProjects.get(i).getProjectName());
         }
         
-        System.out.print("\nEnter project number (0 to cancel): ");
-        int projectChoice;
-        try {
-            projectChoice = Integer.parseInt(sc.nextLine());
-            if (projectChoice == 0) {
-                return;
-            }
-            
-            if (projectChoice < 1 || projectChoice > managedProjects.size()) {
-                System.out.println("Invalid project number. Press Enter to continue.");
-                sc.nextLine();
-                return;
-            }
-        } catch (NumberFormatException e) {
-            System.out.println("Invalid input. Press Enter to continue.");
-            sc.nextLine();
+        // Get project selection with validation
+        int projectChoice = getValidIntInput("\nEnter project number (0 to cancel): ", 
+            input -> input >= 0 && input <= managedProjects.size(), 
+            "Invalid project number.");
+        
+        if (projectChoice == 0) {
             return;
         }
         
@@ -1012,58 +881,40 @@ public class ManagerUI {
             String choice = sc.nextLine();
             
             if (choice.equals("1") || choice.equals("2")) {
-                System.out.print("Enter application number: ");
-                try {
-                    int appIndex = Integer.parseInt(sc.nextLine()) - 1;
-                    if (appIndex < 0 || appIndex >= pendingApplications.size()) {
-                        System.out.println("Invalid application number. Press Enter to continue.");
-                        sc.nextLine();
-                        continue;
+                int appIndex = getValidIntInput("Enter application number: ", 
+                    input -> input >= 1 && input <= pendingApplications.size(), 
+                    "Invalid application number.");
+                
+                Application selectedApp = pendingApplications.get(appIndex - 1);
+                
+                if (choice.equals("1")) {
+                    // Approve application
+                    if (processApplication(selectedApp, true)) {
+                        // Remove from pending list
+                        pendingApplications.remove(appIndex - 1);
                     }
-                    
-                    Application selectedApp = pendingApplications.get(appIndex);
-                    
-                    if (choice.equals("1")) {
-                        // Approve application
-                        if (processApplication(selectedApp, true)) {
-                            // Remove from pending list
-                            pendingApplications.remove(appIndex);
-                        }
-                    } else {
-                        // Reject application
-                        if (processApplication(selectedApp, false)) {
-                            // Remove from pending list
-                            pendingApplications.remove(appIndex);
-                        }
+                } else {
+                    // Reject application
+                    if (processApplication(selectedApp, false)) {
+                        // Remove from pending list
+                        pendingApplications.remove(appIndex - 1);
                     }
-                    
-                    if (pendingApplications.isEmpty()) {
-                        System.out.println("No more pending applications.");
-                        System.out.println("Press Enter to continue...");
-                        sc.nextLine();
-                        break;
-                    }
-                    
-                } catch (NumberFormatException e) {
-                    System.out.println("Invalid input. Press Enter to continue.");
-                    sc.nextLine();
                 }
+                
+                if (pendingApplications.isEmpty()) {
+                    System.out.println("No more pending applications.");
+                    System.out.println("Press Enter to continue...");
+                    sc.nextLine();
+                    break;
+                }
+                
             } else if (choice.equals("3")) {
-                System.out.print("Enter application number: ");
-                try {
-                    int appIndex = Integer.parseInt(sc.nextLine()) - 1;
-                    if (appIndex < 0 || appIndex >= pendingApplications.size()) {
-                        System.out.println("Invalid application number. Press Enter to continue.");
-                        sc.nextLine();
-                        continue;
-                    }
-                    
-                    viewApplicationDetails(pendingApplications.get(appIndex));
-                    
-                } catch (NumberFormatException e) {
-                    System.out.println("Invalid input. Press Enter to continue.");
-                    sc.nextLine();
-                }
+                int appIndex = getValidIntInput("Enter application number: ", 
+                    input -> input >= 1 && input <= pendingApplications.size(), 
+                    "Invalid application number.");
+                
+                viewApplicationDetails(pendingApplications.get(appIndex - 1));
+                
             } else if (choice.equals("4")) {
                 break;
             } else {
@@ -1084,24 +935,8 @@ public class ManagerUI {
         
         if (approve) {
             // Check if there are available units of the appropriate type
-            // In a real system, you would determine the flat type from the application
-            // For now, we'll use a placeholder
-            FlatType requestedType = FlatType.TWO_ROOM;
-            
             // For a married couple, we need to determine which flat type they want
-            if (application.getApplicant().getMaritalStatus() == MaritalStatus.MARRIED) {
-                System.out.println("\nApplicant is eligible for both 2-Room and 3-Room flats.");
-                System.out.println("Determine which flat type they are applying for:");
-                System.out.println("1. 2-Room");
-                System.out.println("2. 3-Room");
-                
-                System.out.print("\nEnter choice: ");
-                String flatChoice = sc.nextLine();
-                
-                if (flatChoice.equals("2")) {
-                    requestedType = FlatType.THREE_ROOM;
-                }
-            }
+            FlatType requestedType = determineFlatType(application);
             
             // Check if there are available units
             if (project.getAvailableUnitsByType(requestedType) <= 0) {
@@ -1134,6 +969,32 @@ public class ManagerUI {
         System.out.println("Press Enter to continue...");
         sc.nextLine();
         return true;
+    }
+    
+    /**
+     * Determine the flat type being requested based on marital status
+     * @param application the application
+     * @return the requested flat type
+     */
+    private FlatType determineFlatType(Application application) {
+        Applicant applicant = application.getApplicant();
+        
+        if (applicant.getMaritalStatus() == MaritalStatus.SINGLE) {
+            // Singles can only apply for 2-Room
+            return FlatType.TWO_ROOM;
+        } else {
+            // For married couples, ask which type they want
+            System.out.println("\nApplicant is eligible for both 2-Room and 3-Room flats.");
+            System.out.println("Determine which flat type they are applying for:");
+            System.out.println("1. 2-Room");
+            System.out.println("2. 3-Room");
+            
+            int choice = getValidIntInput("\nEnter choice: ", 
+                input -> input == 1 || input == 2, 
+                "Invalid choice. Please enter 1 or 2.");
+            
+            return choice == 1 ? FlatType.TWO_ROOM : FlatType.THREE_ROOM;
+        }
     }
     
     /**
@@ -1201,22 +1062,12 @@ public class ManagerUI {
             System.out.println((i + 1) + ". " + managedProjects.get(i).getProjectName());
         }
         
-        System.out.print("\nEnter project number (0 to cancel): ");
-        int projectChoice;
-        try {
-            projectChoice = Integer.parseInt(sc.nextLine());
-            if (projectChoice == 0) {
-                return;
-            }
-            
-            if (projectChoice < 1 || projectChoice > managedProjects.size()) {
-                System.out.println("Invalid project number. Press Enter to continue.");
-                sc.nextLine();
-                return;
-            }
-        } catch (NumberFormatException e) {
-            System.out.println("Invalid input. Press Enter to continue.");
-            sc.nextLine();
+        // Get project selection with validation
+        int projectChoice = getValidIntInput("\nEnter project number (0 to cancel): ", 
+            input -> input >= 0 && input <= managedProjects.size(), 
+            "Invalid project number.");
+        
+        if (projectChoice == 0) {
             return;
         }
         
@@ -1264,47 +1115,23 @@ public class ManagerUI {
             String choice = sc.nextLine();
             
             if (choice.equals("1") || choice.equals("2")) {
-                System.out.print("Enter request number: ");
-                try {
-                    int reqIndex = Integer.parseInt(sc.nextLine()) - 1;
-                    if (reqIndex < 0 || reqIndex >= withdrawalRequests.size()) {
-                        System.out.println("Invalid request number. Press Enter to continue.");
-                        sc.nextLine();
-                        continue;
-                    }
+                int reqIndex = getValidIntInput("Enter request number: ", 
+                    input -> input >= 1 && input <= withdrawalRequests.size(), 
+                    "Invalid request number.");
+                
+                Application selectedReq = withdrawalRequests.get(reqIndex - 1);
+                
+                if (choice.equals("1")) {
+                    // Approve withdrawal
+                    boolean success = managerControl.processWithdrawalRequest(currentUser, selectedReq, true);
                     
-                    Application selectedReq = withdrawalRequests.get(reqIndex);
-                    
-                    if (choice.equals("1")) {
-                        // Approve withdrawal
-                        boolean success = currentUser.processWithdrawalRequest(selectedReq, true);
-                        
-                        if (success) {
-                            System.out.println("Withdrawal approved successfully!");
-                            System.out.println("Applicant: " + selectedReq.getApplicant().getName());
-                            System.out.println("New status: " + selectedReq.getStatus().getDisplayValue());
-                            
-                            // Remove from list
-                            withdrawalRequests.remove(reqIndex);
-                            
-                            if (withdrawalRequests.isEmpty()) {
-                                System.out.println("No more pending withdrawal requests.");
-                                System.out.println("Press Enter to continue...");
-                                sc.nextLine();
-                                break;
-                            }
-                        } else {
-                            System.out.println("Failed to approve withdrawal.");
-                            System.out.println("Press Enter to continue...");
-                            sc.nextLine();
-                        }
-                    } else {
-                        // Reject withdrawal
-                        // In a real system, this would update the request status
-                        System.out.println("Withdrawal rejected successfully!");
+                    if (success) {
+                        System.out.println("Withdrawal approved successfully!");
+                        System.out.println("Applicant: " + selectedReq.getApplicant().getName());
+                        System.out.println("New status: " + selectedReq.getStatus().getDisplayValue());
                         
                         // Remove from list
-                        withdrawalRequests.remove(reqIndex);
+                        withdrawalRequests.remove(reqIndex - 1);
                         
                         if (withdrawalRequests.isEmpty()) {
                             System.out.println("No more pending withdrawal requests.");
@@ -1312,31 +1139,42 @@ public class ManagerUI {
                             sc.nextLine();
                             break;
                         }
-                        
+                    } else {
+                        System.out.println("Failed to approve withdrawal.");
                         System.out.println("Press Enter to continue...");
                         sc.nextLine();
                     }
+                } else {
+                    // Reject withdrawal
+                    boolean success = managerControl.processWithdrawalRequest(currentUser, selectedReq, false);
                     
-                } catch (NumberFormatException e) {
-                    System.out.println("Invalid input. Press Enter to continue.");
-                    sc.nextLine();
-                }
-            } else if (choice.equals("3")) {
-                System.out.print("Enter request number: ");
-                try {
-                    int reqIndex = Integer.parseInt(sc.nextLine()) - 1;
-                    if (reqIndex < 0 || reqIndex >= withdrawalRequests.size()) {
-                        System.out.println("Invalid request number. Press Enter to continue.");
-                        sc.nextLine();
-                        continue;
+                    if (success) {
+                        System.out.println("Withdrawal rejected successfully!");
+                        
+                        // Remove from list
+                        withdrawalRequests.remove(reqIndex - 1);
+                        
+                        if (withdrawalRequests.isEmpty()) {
+                            System.out.println("No more pending withdrawal requests.");
+                            System.out.println("Press Enter to continue...");
+                            sc.nextLine();
+                            break;
+                        }
+                    } else {
+                        System.out.println("Failed to reject withdrawal.");
                     }
                     
-                    viewApplicationDetails(withdrawalRequests.get(reqIndex));
-                    
-                } catch (NumberFormatException e) {
-                    System.out.println("Invalid input. Press Enter to continue.");
+                    System.out.println("Press Enter to continue...");
                     sc.nextLine();
                 }
+                
+            } else if (choice.equals("3")) {
+                int reqIndex = getValidIntInput("Enter request number: ", 
+                    input -> input >= 1 && input <= withdrawalRequests.size(), 
+                    "Invalid request number.");
+                
+                viewApplicationDetails(withdrawalRequests.get(reqIndex - 1));
+                
             } else if (choice.equals("4")) {
                 break;
             } else {
@@ -1350,8 +1188,6 @@ public class ManagerUI {
      * View and reply to enquiries
      */
     private void viewAndReplyToEnquiries() {
-        // This would be similar to the OfficerUI implementation but for all projects
-        // For brevity, implementing a simplified version
         ScreenUtil.clearScreen();
         System.out.println("\n===== View & Reply to Enquiries =====");
         
@@ -1371,22 +1207,12 @@ public class ManagerUI {
             System.out.println((i + 1) + ". " + managedProjects.get(i).getProjectName());
         }
         
-        System.out.print("\nEnter project number (0 to cancel): ");
-        int projectChoice;
-        try {
-            projectChoice = Integer.parseInt(sc.nextLine());
-            if (projectChoice == 0) {
-                return;
-            }
-            
-            if (projectChoice < 1 || projectChoice > managedProjects.size()) {
-                System.out.println("Invalid project number. Press Enter to continue.");
-                sc.nextLine();
-                return;
-            }
-        } catch (NumberFormatException e) {
-            System.out.println("Invalid input. Press Enter to continue.");
-            sc.nextLine();
+        // Get project selection with validation
+        int projectChoice = getValidIntInput("\nEnter project number (0 to cancel): ", 
+            input -> input >= 0 && input <= managedProjects.size(), 
+            "Invalid project number.");
+        
+        if (projectChoice == 0) {
             return;
         }
         
@@ -1402,10 +1228,105 @@ public class ManagerUI {
             return;
         }
         
-        System.out.println("\nFound " + enquiries.size() + " enquiries for " + selectedProject.getProjectName());
-        System.out.println("Enquiry management functionality is similar to Officer UI.");
-        System.out.println("Press Enter to continue...");
-        sc.nextLine();
+        SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy HH:mm");
+        
+        while (true) {
+            ScreenUtil.clearScreen();
+            System.out.println("\n===== Enquiries for " + selectedProject.getProjectName() + " =====");
+            System.out.printf("%-5s %-20s %-20s %-30s\n",
+                    "No.", "Applicant", "Date", "Content");
+            System.out.println("--------------------------------------------------------------------------------");
+            
+            for (int i = 0; i < enquiries.size(); i++) {
+                Enquiry enquiry = enquiries.get(i);
+                System.out.printf("%-5d %-20s %-20s %-30s\n",
+                        (i + 1),
+                        truncateString(enquiry.getApplicant().getName(), 20),
+                        dateFormat.format(enquiry.getSubmissionDate()),
+                        truncateString(enquiry.getContent(), 30));
+            }
+            
+            System.out.println("\nOptions:");
+            System.out.println("1. View Enquiry Details");
+            System.out.println("2. Return to Main Menu");
+            
+            System.out.print("\nEnter your choice: ");
+            String choice = sc.nextLine();
+            
+            if (choice.equals("1")) {
+                int enquiryIndex = getValidIntInput("Enter enquiry number to view details: ", 
+                                                   input -> input >= 1 && input <= enquiries.size(), 
+                                                   "Invalid enquiry number.");
+                viewAndReplyToEnquiry(enquiries.get(enquiryIndex - 1));
+                
+                // Instead of reassigning to enquiries, create a new variable
+                List<Enquiry> updatedEnquiries = enquiryControl.getEnquiriesForProject(selectedProject);
+                enquiries.clear();  // Clear the existing list
+                enquiries.addAll(updatedEnquiries);  // Add all new enquiries to the existing list
+            
+            } else if (choice.equals("2")) {
+                break;
+            } else {
+                System.out.println("Invalid choice. Press Enter to continue.");
+                sc.nextLine();
+            }
+        }
+    }
+    
+    /**
+     * View and reply to a specific enquiry
+     * @param enquiry the enquiry
+     */
+    private void viewAndReplyToEnquiry(Enquiry enquiry) {
+        SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy HH:mm");
+        
+        while (true) {
+            ScreenUtil.clearScreen();
+            System.out.println("\n===== Enquiry Details =====");
+            System.out.println("Enquiry ID: " + enquiry.getEnquiryID());
+            System.out.println("From: " + enquiry.getApplicant().getName() + " (" +
+                    enquiry.getApplicant().getNRIC() + ")");
+            System.out.println("Project: " + enquiry.getProject().getProjectName());
+            System.out.println("Date: " + dateFormat.format(enquiry.getSubmissionDate()));
+            System.out.println("\nContent:");
+            System.out.println(enquiry.getContent());
+            
+            List<String> replies = enquiry.getReplies();
+            if (!replies.isEmpty()) {
+                System.out.println("\nReplies:");
+                for (int i = 0; i < replies.size(); i++) {
+                    System.out.println((i + 1) + ". " + replies.get(i));
+                }
+            }
+            
+            System.out.println("\nOptions:");
+            System.out.println("1. Reply to Enquiry");
+            System.out.println("2. Return to Enquiry List");
+            
+            System.out.print("\nEnter your choice: ");
+            String choice = sc.nextLine();
+            
+            if (choice.equals("1")) {
+                System.out.println("\nEnter your reply:");
+                String reply = sc.nextLine();
+                
+                if (!reply.trim().isEmpty()) {
+                    // Add reply to the enquiry
+                    enquiryControl.addReply(enquiry, reply, currentUser);
+                    System.out.println("Reply submitted successfully!");
+                } else {
+                    System.out.println("Reply cannot be empty.");
+                }
+                
+                System.out.println("Press Enter to continue...");
+                sc.nextLine();
+            } else if (choice.equals("2")) {
+                break;
+            } else {
+                System.out.println("Invalid choice. Press Enter to continue.");
+                sc.nextLine();
+            }
+        }
     }
     
     /**
@@ -1464,22 +1385,12 @@ public class ManagerUI {
             System.out.println((i + 1) + ". " + managedProjects.get(i).getProjectName());
         }
         
-        System.out.print("\nEnter project number (0 to cancel): ");
-        int projectChoice;
-        try {
-            projectChoice = Integer.parseInt(sc.nextLine());
-            if (projectChoice == 0) {
-                return;
-            }
-            
-            if (projectChoice < 1 || projectChoice > managedProjects.size()) {
-                System.out.println("Invalid project number. Press Enter to continue.");
-                sc.nextLine();
-                return;
-            }
-        } catch (NumberFormatException e) {
-            System.out.println("Invalid input. Press Enter to continue.");
-            sc.nextLine();
+        // Get project selection with validation
+        int projectChoice = getValidIntInput("\nEnter project number (0 to cancel): ", 
+            input -> input >= 0 && input <= managedProjects.size(), 
+            "Invalid project number.");
+        
+        if (projectChoice == 0) {
             return;
         }
         
@@ -1586,10 +1497,7 @@ public class ManagerUI {
         System.out.println("Total Applications: " + filteredApplications.size());
         
         // Count by status
-        Map<ApplicationStatus, Integer> statusCounts = new HashMap<>();
-        for (Application app : filteredApplications) {
-            statusCounts.put(app.getStatus(), statusCounts.getOrDefault(app.getStatus(), 0) + 1);
-        }
+        Map<ApplicationStatus, Integer> statusCounts = countByStatus(filteredApplications);
         
         System.out.println("\nApplications by Status:");
         for (Map.Entry<ApplicationStatus, Integer> entry : statusCounts.entrySet()) {
@@ -1597,11 +1505,7 @@ public class ManagerUI {
         }
         
         // Count by marital status
-        Map<MaritalStatus, Integer> maritalCounts = new HashMap<>();
-        for (Application app : filteredApplications) {
-            MaritalStatus status = app.getApplicant().getMaritalStatus();
-            maritalCounts.put(status, maritalCounts.getOrDefault(status, 0) + 1);
-        }
+        Map<MaritalStatus, Integer> maritalCounts = countByMaritalStatus(filteredApplications);
         
         System.out.println("\nApplicants by Marital Status:");
         for (Map.Entry<MaritalStatus, Integer> entry : maritalCounts.entrySet()) {
@@ -1632,6 +1536,37 @@ public class ManagerUI {
     }
     
     /**
+     * Count applications by status
+     * @param applications the applications to count
+     * @return map of status to count
+     */
+    private Map<ApplicationStatus, Integer> countByStatus(List<Application> applications) {
+        Map<ApplicationStatus, Integer> counts = new HashMap<>();
+        
+        for (Application app : applications) {
+            ApplicationStatus status = app.getStatus();
+            counts.put(status, counts.getOrDefault(status, 0) + 1);
+        }
+        
+        return counts;
+    }
+    
+    /**
+     * Count applications by marital status
+     * @param applications the applications to count
+     * @return map of marital status to count
+     */
+    private Map<MaritalStatus, Integer> countByMaritalStatus(List<Application> applications) {
+        Map<MaritalStatus, Integer> counts = new HashMap<>();
+        
+        for (Application app : applications) {
+            MaritalStatus status = app.getApplicant().getMaritalStatus();
+            counts.put(status, counts.getOrDefault(status, 0) + 1);
+        }
+        
+        return counts;
+    }
+    /**
      * Generate a flat booking report
      */
     private void generateBookingReport() {
@@ -1654,22 +1589,12 @@ public class ManagerUI {
             System.out.println((i + 1) + ". " + managedProjects.get(i).getProjectName());
         }
         
-        System.out.print("\nEnter project number (0 to cancel): ");
-        int projectChoice;
-        try {
-            projectChoice = Integer.parseInt(sc.nextLine());
-            if (projectChoice == 0) {
-                return;
-            }
-            
-            if (projectChoice < 1 || projectChoice > managedProjects.size()) {
-                System.out.println("Invalid project number. Press Enter to continue.");
-                sc.nextLine();
-                return;
-            }
-        } catch (NumberFormatException e) {
-            System.out.println("Invalid input. Press Enter to continue.");
-            sc.nextLine();
+        // Get project selection with validation
+        int projectChoice = getValidIntInput("\nEnter project number (0 to cancel): ", 
+            input -> input >= 0 && input <= managedProjects.size(), 
+            "Invalid project number.");
+        
+        if (projectChoice == 0) {
             return;
         }
         
@@ -1753,13 +1678,7 @@ public class ManagerUI {
         System.out.println("Total Bookings: " + filteredApplications.size());
         
         // Count by flat type
-        Map<FlatType, Integer> flatTypeCounts = new HashMap<>();
-        for (Application app : filteredApplications) {
-            if (app.getBookedFlat() != null) {
-                FlatType type = app.getBookedFlat().getType();
-                flatTypeCounts.put(type, flatTypeCounts.getOrDefault(type, 0) + 1);
-            }
-        }
+        Map<FlatType, Integer> flatTypeCounts = countByFlatType(filteredApplications);
         
         System.out.println("\nBookings by Flat Type:");
         for (Map.Entry<FlatType, Integer> entry : flatTypeCounts.entrySet()) {
@@ -1767,11 +1686,7 @@ public class ManagerUI {
         }
         
         // Count by marital status
-        Map<MaritalStatus, Integer> maritalCounts = new HashMap<>();
-        for (Application app : filteredApplications) {
-            MaritalStatus status = app.getApplicant().getMaritalStatus();
-            maritalCounts.put(status, maritalCounts.getOrDefault(status, 0) + 1);
-        }
+        Map<MaritalStatus, Integer> maritalCounts = countByMaritalStatus(filteredApplications);
         
         System.out.println("\nApplicants by Marital Status:");
         for (Map.Entry<MaritalStatus, Integer> entry : maritalCounts.entrySet()) {
@@ -1802,6 +1717,25 @@ public class ManagerUI {
         
         System.out.println("\nPress Enter to continue...");
         sc.nextLine();
+    }
+    
+    /**
+     * Count applications by flat type
+     * @param applications the applications to count
+     * @return map of flat type to count
+     */
+    private Map<FlatType, Integer> countByFlatType(List<Application> applications) {
+        Map<FlatType, Integer> counts = new HashMap<>();
+        
+        for (Application app : applications) {
+            Flat flat = app.getBookedFlat();
+            if (flat != null) {
+                FlatType type = flat.getType();
+                counts.put(type, counts.getOrDefault(type, 0) + 1);
+            }
+        }
+        
+        return counts;
     }
     
     /**
@@ -1878,5 +1812,77 @@ public class ManagerUI {
             return str;
         }
         return str.substring(0, maxLength - 3) + "...";
+    }
+    
+    /**
+     * Get valid input based on a predicate
+     * @param prompt the prompt to display
+     * @param validator the validation predicate
+     * @param errorMessage the error message to display if validation fails
+     * @return the valid input string
+     */
+    private String getValidInput(String prompt, Predicate<String> validator, String errorMessage) {
+        while (true) {
+            System.out.print(prompt);
+            String input = sc.nextLine();
+            
+            if (validator.test(input)) {
+                return input;
+            } else {
+                System.out.println(errorMessage);
+            }
+        }
+    }
+    
+    /**
+     * Get valid integer input
+     * @param prompt the prompt to display
+     * @param validator the validation predicate
+     * @param errorMessage the error message to display if validation fails
+     * @return the valid integer
+     */
+    private int getValidIntInput(String prompt, Predicate<Integer> validator, String errorMessage) {
+        while (true) {
+            System.out.print(prompt);
+            try {
+                int input = Integer.parseInt(sc.nextLine());
+                
+                if (validator.test(input)) {
+                    return input;
+                } else {
+                    System.out.println(errorMessage);
+                }
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid number format. Please enter a valid integer.");
+            }
+        }
+    }
+    
+    /**
+     * Get valid date input
+     * @param prompt the prompt to display
+     * @param dateFormat the date format to use
+     * @return the valid date
+     */
+    private Date getValidDateInput(String prompt, SimpleDateFormat dateFormat) {
+        while (true) {
+            System.out.print(prompt);
+            try {
+                return dateFormat.parse(sc.nextLine());
+            } catch (ParseException e) {
+                System.out.println("Invalid date format. Please use format: " + 
+                                  ((SimpleDateFormat) dateFormat.clone()).toPattern());
+            }
+        }
+    }
+    
+    /**
+     * Get input with a prompt
+     * @param prompt the prompt to display
+     * @return the input string
+     */
+    private String getInputWithPrompt(String prompt) {
+        System.out.print(prompt);
+        return sc.nextLine();
     }
 }

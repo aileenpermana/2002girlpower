@@ -2,19 +2,25 @@ package control;
 
 import entity.*;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Controls operations related to HDB Managers in the BTO system.
  * Demonstrates the Controller pattern in MVC architecture.
+ * Applies Single Responsibility Principle by focusing only on manager-related operations.
  */
 public class HDBManagerControl {
-    private ProjectControl projectControl;
+    private final ProjectControl projectControl;
+    private final HDBOfficerControl officerControl;
+    private final ApplicationControl applicationControl;
     
     /**
      * Constructor for HDBManagerControl
      */
     public HDBManagerControl() {
         this.projectControl = new ProjectControl();
+        this.officerControl = new HDBOfficerControl();
+        this.applicationControl = new ApplicationControl();
     }
     
     /**
@@ -23,8 +29,6 @@ public class HDBManagerControl {
      * @return list of officer registrations
      */
     public List<Map<String, Object>> getOfficerRegistrations(Project project) {
-        // Delegate to HDBOfficerControl
-        HDBOfficerControl officerControl = new HDBOfficerControl();
         return officerControl.getOfficerRegistrationsForProject(project);
     }
     
@@ -38,7 +42,7 @@ public class HDBManagerControl {
      */
     public boolean processOfficerRegistration(HDBManager manager, HDBOfficer officer, Project project, boolean approve) {
         // Check if manager is in charge of the project
-        if (!project.getManagerInCharge().getManagerID().equals(manager.getManagerID())) {
+        if (!isManagerInChargeOfProject(manager, project)) {
             return false;
         }
         
@@ -60,11 +64,10 @@ public class HDBManagerControl {
      */
     public int processApplications(HDBManager manager, List<Application> applications, Map<String, Boolean> approvals) {
         int processed = 0;
-        ApplicationControl applicationControl = new ApplicationControl();
         
         for (Application app : applications) {
             // Check if manager is in charge of the project
-            if (!app.getProject().getManagerInCharge().getManagerID().equals(manager.getManagerID())) {
+            if (!isManagerInChargeOfProject(manager, app.getProject())) {
                 continue;
             }
             
@@ -79,31 +82,8 @@ public class HDBManagerControl {
                 continue; // No decision for this application
             }
             
-            if (isApproved) {
-                // Approve application
-                // Check if there are available units of the requested type
-                FlatType requestedType = determineRequestedFlatType(app);
-                
-                if (app.getProject().getAvailableUnitsByType(requestedType) > 0) {
-                    app.setStatus(ApplicationStatus.SUCCESSFUL);
-                    
-                    // Decrement available units
-                    Project project = app.getProject();
-                    project.decrementAvailableUnits(requestedType);
-                    
-                    // Update project
-                    projectControl.updateProject(project);
-                } else {
-                    // Not enough units, reject instead
-                    app.setStatus(ApplicationStatus.UNSUCCESSFUL);
-                }
-            } else {
-                // Reject application
-                app.setStatus(ApplicationStatus.UNSUCCESSFUL);
-            }
-            
-            // Update application
-            if (applicationControl.updateApplication(app)) {
+            // Process the application
+            if (processApplication(app, isApproved)) {
                 processed++;
             }
         }
@@ -112,28 +92,61 @@ public class HDBManagerControl {
     }
     
     /**
+     * Process a single application
+     * @param application the application to process
+     * @param isApproved whether to approve or reject
+     * @return true if successfully processed, false otherwise
+     */
+    private boolean processApplication(Application application, boolean isApproved) {
+        if (isApproved) {
+            // Approve application
+            FlatType requestedType = determineRequestedFlatType(application);
+            Project project = application.getProject();
+            
+            if (project.getAvailableUnitsByType(requestedType) > 0) {
+                application.setStatus(ApplicationStatus.SUCCESSFUL);
+                project.decrementAvailableUnits(requestedType);
+                projectControl.updateProject(project);
+            } else {
+                // Not enough units, reject instead
+                application.setStatus(ApplicationStatus.UNSUCCESSFUL);
+            }
+        } else {
+            // Reject application
+            application.setStatus(ApplicationStatus.UNSUCCESSFUL);
+        }
+        
+        // Update application
+        return applicationControl.updateApplication(application);
+    }
+    
+    /**
+     * Check if a manager is in charge of a project
+     * @param manager the manager
+     * @param project the project
+     * @return true if manager is in charge, false otherwise
+     */
+    private boolean isManagerInChargeOfProject(HDBManager manager, Project project) {
+        return project.getManagerInCharge().getManagerID().equals(manager.getManagerID());
+    }
+    
+    /**
      * Determine which flat type an applicant is applying for
      * @param application the application
      * @return the requested flat type
      */
     private FlatType determineRequestedFlatType(Application application) {
-        // In a real system, this would be determined from the application
-        // This is a simplified placeholder implementation
         Applicant applicant = application.getApplicant();
+        Project project = application.getProject();
         
         if (applicant.getMaritalStatus() == MaritalStatus.SINGLE) {
             // Singles can only apply for 2-Room
             return FlatType.TWO_ROOM;
         } else {
             // For married couples, check which type they're applying for
-            // This would be stored in the application in a real system
-            // For now, we'll assume they're applying for 3-Room if available
-            Project project = application.getProject();
-            if (project.getAvailableUnitsByType(FlatType.THREE_ROOM) > 0) {
-                return FlatType.THREE_ROOM;
-            } else {
-                return FlatType.TWO_ROOM;
-            }
+            // For now, assume they're applying for 3-Room if available
+            return project.getAvailableUnitsByType(FlatType.THREE_ROOM) > 0 ? 
+                   FlatType.THREE_ROOM : FlatType.TWO_ROOM;
         }
     }
     
@@ -145,12 +158,10 @@ public class HDBManagerControl {
      * @return true if processing is successful, false otherwise
      */
     public boolean processWithdrawalRequest(HDBManager manager, Application application, boolean approve) {
-        // Check if manager is in charge of the project
-        if (!application.getProject().getManagerInCharge().getManagerID().equals(manager.getManagerID())) {
+        if (!isManagerInChargeOfProject(manager, application.getProject())) {
             return false;
         }
         
-        // Process the withdrawal
         return manager.processWithdrawalRequest(application, approve);
     }
     
@@ -161,8 +172,25 @@ public class HDBManagerControl {
      * @return the created project, or null if creation failed
      */
     public Project createProject(HDBManager manager, Map<String, Object> details) {
+        // Check if manager is already managing a project in the same period
+        Date openDate = (Date) details.get("openDate");
+        Date closeDate = (Date) details.get("closeDate");
+        
+        if (manager.isManagingProject(openDate, closeDate)) {
+            return null;
+        }
+        
         // Create the project
-        return manager.createProject(details);
+        boolean success = manager.createProject(details);
+        if (success) {
+            // Get the last project added to the manager's list
+            List<Project> managedProjects = manager.getManagedProjects();
+            if (!managedProjects.isEmpty()) {
+                return managedProjects.get(managedProjects.size() - 1);
+            }
+        }
+        
+        return null;
     }
     
     /**
@@ -174,7 +202,7 @@ public class HDBManagerControl {
      */
     public boolean editProject(HDBManager manager, Project project, Map<String, Object> details) {
         // Check if manager is in charge of the project
-        if (!project.getManagerInCharge().getManagerID().equals(manager.getManagerID())) {
+        if (!isManagerInChargeOfProject(manager, project)) {
             return false;
         }
         
@@ -190,7 +218,7 @@ public class HDBManagerControl {
      */
     public boolean deleteProject(HDBManager manager, Project project) {
         // Check if manager is in charge of the project
-        if (!project.getManagerInCharge().getManagerID().equals(manager.getManagerID())) {
+        if (!isManagerInChargeOfProject(manager, project)) {
             return false;
         }
         
@@ -221,7 +249,12 @@ public class HDBManagerControl {
      * @return list of projects
      */
     public List<Project> getProjectsByManager(HDBManager manager) {
-        return projectControl.getProjectsByManager(manager);
+        List<Project> allProjects = projectControl.getAllProjects();
+        
+        // Use streams for cleaner filtering
+        return allProjects.stream()
+            .filter(p -> p.getManagerInCharge().getNRIC().equals(manager.getNRIC()))
+            .collect(Collectors.toList());
     }
     
     /**
@@ -230,5 +263,81 @@ public class HDBManagerControl {
      */
     public List<Project> getAllProjects() {
         return projectControl.getAllProjects();
+    }
+    
+    /**
+     * Generate a report based on applications
+     * @param applications the applications to include in the report
+     * @param filters the filters to apply
+     * @return the generated report
+     */
+    public Report generateReport(List<Application> applications, Map<String, Object> filters) {
+        // Apply filters if provided
+        List<Application> filteredApps = applications;
+        if (filters != null && !filters.isEmpty()) {
+            filteredApps = applyFilters(applications, filters);
+        }
+        
+        // Create a report
+        Report report = new Report();
+        report.setReportID("RPT" + System.currentTimeMillis() % 10000);
+        report.setApplications(filteredApps);
+        report.setGenerationDate(new Date());
+        report.setCriteria(filters != null ? new HashMap<>(filters) : new HashMap<>());
+        
+        return report;
+    }
+    
+    /**
+     * Apply filters to applications
+     * @param applications the applications to filter
+     * @param filters the filters to apply
+     * @return filtered list of applications
+     */
+    private List<Application> applyFilters(List<Application> applications, Map<String, Object> filters) {
+        List<Application> result = new ArrayList<>(applications);
+        
+        // Apply marital status filter
+        if (filters.containsKey("maritalStatus")) {
+            String maritalStatusStr = (String) filters.get("maritalStatus");
+            MaritalStatus status = MaritalStatus.fromString(maritalStatusStr);
+            
+            if (status != null) {
+                result.removeIf(app -> app.getApplicant().getMaritalStatus() != status);
+            }
+        }
+        
+        // Apply age range filter
+        if (filters.containsKey("minAge")) {
+            int minAge = (int) filters.get("minAge");
+            result.removeIf(app -> app.getApplicant().getAge() < minAge);
+        }
+        
+        if (filters.containsKey("maxAge")) {
+            int maxAge = (int) filters.get("maxAge");
+            result.removeIf(app -> app.getApplicant().getAge() > maxAge);
+        }
+        
+        // Apply flat type filter
+        if (filters.containsKey("flatType")) {
+            String flatTypeStr = (String) filters.get("flatType");
+            FlatType flatType = null;
+            
+            if (flatTypeStr.equalsIgnoreCase("2-Room")) {
+                flatType = FlatType.TWO_ROOM;
+            } else if (flatTypeStr.equalsIgnoreCase("3-Room")) {
+                flatType = FlatType.THREE_ROOM;
+            }
+            
+            if (flatType != null) {
+                FlatType finalFlatType = flatType;
+                result.removeIf(app -> {
+                    Flat bookedFlat = app.getBookedFlat();
+                    return bookedFlat == null || bookedFlat.getType() != finalFlatType;
+                });
+            }
+        }
+        
+        return result;
     }
 }

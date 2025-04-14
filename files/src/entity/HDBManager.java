@@ -6,13 +6,15 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Represents an HDB Manager in the BTO system.
  * Extends the User class with manager-specific functionality.
- * Demonstrates inheritance (extends User) and method overriding.
+ * Demonstrates Single Responsibility Principle by focusing only on manager operations.
+ * Implements ProjectManagement interface (Interface Segregation Principle)
  */
-public class HDBManager extends User {
+public class HDBManager extends User implements ProjectManagement {
     private String managerID;
     private List<Project> managingProjects;
     
@@ -63,10 +65,12 @@ public class HDBManager extends User {
     
     /**
      * Create a new BTO project
+     * Implements ProjectManagement interface method
      * @param details map containing project details
-     * @return the created project, or null if creation failed
+     * @return true if creation was successful, false otherwise
      */
-    public Project createProject(Map<String, Object> details) {
+    @Override
+    public boolean createProject(Map<String, Object> details) {
         // Extract project details
         String projectName = (String) details.get("projectName");
         String neighborhood = (String) details.get("neighborhood");
@@ -76,7 +80,7 @@ public class HDBManager extends User {
         
         // Check if manager is already managing a project in the same period
         if (isManagingProject(openDate, closeDate)) {
-            return null;
+            return false;
         }
         
         // Create flat type units map
@@ -84,9 +88,12 @@ public class HDBManager extends User {
         totalUnits.put(FlatType.TWO_ROOM, (int) details.get("twoRoomUnits"));
         totalUnits.put(FlatType.THREE_ROOM, (int) details.get("threeRoomUnits"));
         
+        // Generate project ID
+        String projectID = generateProjectID(projectName);
+        
         // Create the project
         Project project = new Project(
-            generateProjectID(projectName),
+            projectID,
             projectName,
             neighborhood,
             totalUnits,
@@ -101,9 +108,7 @@ public class HDBManager extends User {
         
         // Save to database via Project Control
         ProjectControl projectControl = new ProjectControl();
-        projectControl.addProject(project);
-        
-        return project;
+        return projectControl.addProject(project);
     }
     
     /**
@@ -119,43 +124,45 @@ public class HDBManager extends User {
     
     /**
      * Edit an existing project
+     * Implements ProjectManagement interface method
      * @param project the project to edit
      * @param details map containing updated details
      * @return true if edit was successful, false otherwise
      */
+    @Override
     public boolean editProject(Project project, Map<String, Object> details) {
         // Check if manager is managing this project
         if (!managingProjects.contains(project)) {
             return false;
         }
         
-        // Update project details
-        if (details.containsKey("projectName")) {
-            project.setProjectName((String) details.get("projectName"));
-        }
+        // Update project details using Optional for cleaner code
+        Optional.ofNullable((String) details.get("projectName"))
+            .ifPresent(project::setProjectName);
         
-        if (details.containsKey("neighborhood")) {
-            project.setNeighborhood((String) details.get("neighborhood"));
-        }
+        Optional.ofNullable((String) details.get("neighborhood"))
+            .ifPresent(project::setNeighborhood);
         
-        if (details.containsKey("openDate")) {
-            project.setApplicationOpenDate((Date) details.get("openDate"));
-        }
+        Optional.ofNullable((Date) details.get("openDate"))
+            .ifPresent(project::setApplicationOpenDate);
         
-        if (details.containsKey("closeDate")) {
-            project.setApplicationCloseDate((Date) details.get("closeDate"));
-        }
+        Optional.ofNullable((Date) details.get("closeDate"))
+            .ifPresent(project::setApplicationCloseDate);
         
+        // Update flat units if provided
         if (details.containsKey("twoRoomUnits")) {
-            project.setNumberOfUnitsByType(FlatType.TWO_ROOM, (int) details.get("twoRoomUnits"));
+            int twoRoomUnits = (int) details.get("twoRoomUnits");
+            project.setNumberOfUnitsByType(FlatType.TWO_ROOM, twoRoomUnits);
         }
         
         if (details.containsKey("threeRoomUnits")) {
-            project.setNumberOfUnitsByType(FlatType.THREE_ROOM, (int) details.get("threeRoomUnits"));
+            int threeRoomUnits = (int) details.get("threeRoomUnits");
+            project.setNumberOfUnitsByType(FlatType.THREE_ROOM, threeRoomUnits);
         }
         
         if (details.containsKey("officerSlots")) {
-            project.setOfficerSlots((int) details.get("officerSlots"));
+            int officerSlots = (int) details.get("officerSlots");
+            project.setOfficerSlots(officerSlots);
         }
         
         // Save changes via Project Control
@@ -165,9 +172,11 @@ public class HDBManager extends User {
     
     /**
      * Delete a project
+     * Implements ProjectManagement interface method
      * @param project the project to delete
      * @return true if deletion was successful, false otherwise
      */
+    @Override
     public boolean deleteProject(Project project) {
         // Check if manager is managing this project
         if (!managingProjects.contains(project)) {
@@ -184,15 +193,13 @@ public class HDBManager extends User {
     
     /**
      * Toggle the visibility of a project
+     * Implements ProjectManagement interface method
      * @param project the project to toggle
      * @param visible whether the project should be visible
      * @return true if successful, false otherwise
      */
+    @Override
     public boolean toggleVisibility(Project project, boolean visible) {
-        // Check if manager is managing this project
-        if (!managingProjects.contains(project)) {
-            return false;
-        }
         
         project.setVisible(visible);
         
@@ -270,6 +277,7 @@ public class HDBManager extends User {
             // If the application was successful or booked, increment available units
             if (currentStatus == ApplicationStatus.SUCCESSFUL || currentStatus == ApplicationStatus.BOOKED) {
                 // In a real system, you would determine the flat type from the application
+                // For now, we'll use a placeholder
                 FlatType flatType = FlatType.TWO_ROOM; // Placeholder
                 project.incrementAvailableUnits(flatType);
                 
@@ -289,5 +297,16 @@ public class HDBManager extends User {
         }
         
         return true;
+    }
+    
+    /**
+     * Add a project to this manager's list
+     * Used when loading projects from storage
+     * @param project the project to add
+     */
+    public void addProject(Project project) {
+        if (!managingProjects.contains(project)) {
+            managingProjects.add(project);
+        }
     }
 }

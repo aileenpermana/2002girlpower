@@ -247,6 +247,14 @@ public class Project {
     }
     
     /**
+     * Set the manager in charge of this project
+     * @param manager the new manager in charge
+     */
+    public void setManagerInCharge(HDBManager manager) {
+        this.managerInCharge = manager;
+    }
+    
+    /**
      * Get the list of officers assigned to this project
      * @return list of officers
      */

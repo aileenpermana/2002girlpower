@@ -1,21 +1,134 @@
 package control;
 
 import entity.*;
-import java.io.*;
 import java.util.*;
+import java.util.stream.Collectors;
+import utils.ApplicationCSVStorage;
+import utils.DataStorage;
 
 /**
- * Controls operations related to Applications in the BTO system.
+ * Enhanced control class for managing applications in the BTO system.
+ * Demonstrates Dependency Inversion Principle and Single Responsibility Principle.
  */
 public class ApplicationControl {
-    private static final String APPLICATIONS_FILE = "files/resources/ApplicationList.csv";
-    private List<Application> applications;
+    private final DataStorage<Application> applicationStorage;
+    private final ProjectControl projectControl;
     
     /**
-     * Constructor initializes the applications list from storage
+     * Constructor with default storage
      */
     public ApplicationControl() {
-        this.applications = loadApplications();
+        this.applicationStorage = new ApplicationCSVStorage();
+        this.projectControl = new ProjectControl();
+    }
+    
+    /**
+     * Constructor with custom storage (for testing or different storage methods)
+     * Demonstrates Dependency Inversion Principle
+     */
+    public ApplicationControl(DataStorage<Application> storage) {
+        this.applicationStorage = storage;
+        this.projectControl = new ProjectControl();
+    }
+    
+    /**
+     * Get all applications in the system
+     * @return list of all applications
+     */
+    public List<Application> getAllApplications() {
+        return applicationStorage.readAll();
+    }
+    
+    /**
+     * Get all applications for a project
+     * @param project the project
+     * @return list of all applications for the project
+     */
+    public List<Application> getAllApplications(Project project) {
+        return getAllApplications().stream()
+            .filter(app -> app.getProject().getProjectID().equals(project.getProjectID()))
+            .collect(Collectors.toList());
+    }
+    
+    /**
+     * Get pending applications for a project
+     * @param project the project
+     * @return list of pending applications
+     */
+    public List<Application> getPendingApplications(Project project) {
+        return getAllApplications(project).stream()
+            .filter(app -> app.getStatus() == ApplicationStatus.PENDING)
+            .collect(Collectors.toList());
+    }
+    
+    /**
+     * Get successful applications for a project
+     * @param project the project
+     * @return list of successful applications
+     */
+    public List<Application> getSuccessfulApplications(Project project) {
+        return getAllApplications(project).stream()
+            .filter(app -> app.getStatus() == ApplicationStatus.SUCCESSFUL)
+            .collect(Collectors.toList());
+    }
+    
+    /**
+     * Get booked applications for a project
+     * @param project the project
+     * @return list of booked applications
+     */
+    public List<Application> getBookedApplications(Project project) {
+        return getAllApplications(project).stream()
+            .filter(app -> app.getStatus() == ApplicationStatus.BOOKED)
+            .collect(Collectors.toList());
+    }
+    
+    /**
+     * Get unsuccessful applications for a project
+     * @param project the project
+     * @return list of unsuccessful applications
+     */
+    public List<Application> getUnsuccessfulApplications(Project project) {
+        return getAllApplications(project).stream()
+            .filter(app -> app.getStatus() == ApplicationStatus.UNSUCCESSFUL)
+            .collect(Collectors.toList());
+    }
+    
+    /**
+     * Get applications for an applicant
+     * @param applicant the applicant
+     * @return list of applications for the applicant
+     */
+    public List<Application> getApplicationsForApplicant(Applicant applicant) {
+        return getAllApplications().stream()
+            .filter(app -> app.getApplicant().getNRIC().equals(applicant.getNRIC()))
+            .collect(Collectors.toList());
+    }
+    
+    /**
+     * Get application by ID
+     * @param applicationID the application ID
+     * @return the application, or null if not found
+     */
+    public Application getApplicationByID(String applicationID) {
+        return getAllApplications().stream()
+            .filter(app -> app.getApplicationID().equals(applicationID))
+            .findFirst()
+            .orElse(null);
+    }
+    
+    /**
+     * Find an application by applicant NRIC and project
+     * @param nric the applicant's NRIC
+     * @param project the project
+     * @return the application, or null if not found
+     */
+    public Application findApplicationByNRICAndProject(String nric, Project project) {
+        return getAllApplications().stream()
+            .filter(app -> app.getApplicant().getNRIC().equals(nric) &&
+                        app.getProject().getProjectID().equals(project.getProjectID()))
+            .findFirst()
+            .orElse(null);
     }
     
     /**
@@ -26,7 +139,7 @@ public class ApplicationControl {
      */
     public boolean submitApplication(Applicant applicant, Project project) {
         // Check if applicant already has an active application
-        if (applicant.hasActiveApplications()) {
+        if (hasActiveApplication(applicant)) {
             return false;
         }
         
@@ -43,11 +156,28 @@ public class ApplicationControl {
         // Create new application
         Application application = new Application(applicant, project);
         
-        // Add to list
-        applications.add(application);
-        
-        // Save to file
-        return saveApplications();
+        // Save to storage
+        return applicationStorage.save(application);
+    }
+    
+    /**
+     * Check if applicant has an active application
+     * @param applicant the applicant
+     * @return true if has active application, false otherwise
+     */
+    private boolean hasActiveApplication(Applicant applicant) {
+        return getApplicationsForApplicant(applicant).stream()
+            .anyMatch(app -> app.getStatus() == ApplicationStatus.PENDING || 
+                           app.getStatus() == ApplicationStatus.SUCCESSFUL);
+    }
+    
+    /**
+     * Update an application
+     * @param application the application to update
+     * @return true if update is successful, false otherwise
+     */
+    public boolean updateApplication(Application application) {
+        return applicationStorage.update(application);
     }
     
     /**
@@ -62,286 +192,125 @@ public class ApplicationControl {
         }
         
         // In a real system, you would create a withdrawal request
-        // For this implementation, we'll mark it as a special status
-        // This would be tracked elsewhere
+        // For this implementation, we'll mark it as unsuccessful
+        application.setStatus(ApplicationStatus.UNSUCCESSFUL);
         
-        return true;
-    }
-    
-    /**
-     * Get all applications in the system
-     * @return list of all applications
-     */
-    public List<Application> getAllApplications() {
-        return new ArrayList<>(applications);
-    }
-    
-    /**
-     * Get all applications for a project
-     * @param project the project
-     * @return list of all applications for the project
-     */
-    public List<Application> getAllApplications(Project project) {
-        List<Application> projectApplications = new ArrayList<>();
-        
-        for (Application app : applications) {
-            if (app.getProject().getProjectID().equals(project.getProjectID())) {
-                projectApplications.add(app);
-            }
-        }
-        
-        return projectApplications;
-    }
-    
-    /**
-     * Get pending applications for a project
-     * @param project the project
-     * @return list of pending applications
-     */
-    public List<Application> getPendingApplications(Project project) {
-        List<Application> pendingApplications = new ArrayList<>();
-        
-        for (Application app : applications) {
-            if (app.getProject().getProjectID().equals(project.getProjectID()) && 
-                app.getStatus() == ApplicationStatus.PENDING) {
-                pendingApplications.add(app);
-            }
-        }
-        
-        return pendingApplications;
-    }
-    
-    /**
-     * Get booked applications for a project
-     * @param project the project
-     * @return list of booked applications
-     */
-    public List<Application> getBookedApplications(Project project) {
-        List<Application> bookedApplications = new ArrayList<>();
-        
-        for (Application app : applications) {
-            if (app.getProject().getProjectID().equals(project.getProjectID()) && 
-                app.getStatus() == ApplicationStatus.BOOKED) {
-                bookedApplications.add(app);
-            }
-        }
-        
-        return bookedApplications;
+        // Update application
+        return updateApplication(application);
     }
     
     /**
      * Get withdrawal requests for a project
+     * This is a placeholder method for demonstration
+     * In a real system, this would interact with a WithdrawalControl
      * @param project the project
-     * @return list of withdrawal requests
+     * @return list of withdrawal requests (applications with withdrawal requests)
      */
     public List<Application> getWithdrawalRequests(Project project) {
-        // In a real system, withdrawal requests would be tracked separately
-        // For this implementation, we'll return an empty list
+        // This is a placeholder that always returns an empty list
+        // In a real implementation, this would interact with the WithdrawalControl
         return new ArrayList<>();
     }
     
     /**
-     * Update an application
-     * @param application the application to update
-     * @return true if update is successful, false otherwise
+     * Process an application (approve or reject)
+     * @param application the application to process
+     * @param approve true to approve, false to reject
+     * @return true if processing is successful, false otherwise
      */
-    public boolean updateApplication(Application application) {
-        // Find and update application
-        for (int i = 0; i < applications.size(); i++) {
-            if (applications.get(i).getApplicationID().equals(application.getApplicationID())) {
-                applications.set(i, application);
-                return saveApplications();
+    public boolean processApplication(Application application, boolean approve) {
+        if (approve) {
+            // Check flat availability
+            FlatType requestedType = determineRequestedFlatType(application);
+            Project project = application.getProject();
+            
+            if (project.getAvailableUnitsByType(requestedType) <= 0) {
+                return false; // No available units
             }
+            
+            // Approve the application
+            application.setStatus(ApplicationStatus.SUCCESSFUL);
+            
+            // Decrement available units
+            project.decrementAvailableUnits(requestedType);
+            projectControl.updateProject(project);
+        } else {
+            // Reject the application
+            application.setStatus(ApplicationStatus.UNSUCCESSFUL);
         }
         
-        return false; // Application not found
+        // Update application
+        return updateApplication(application);
     }
     
     /**
-     * Get applications for an applicant
-     * @param applicant the applicant
-     * @return list of applications for the applicant
+     * Determine which flat type an applicant is requesting
+     * @param application the application
+     * @return the requested flat type
      */
-    public List<Application> getApplicationsForApplicant(Applicant applicant) {
-        List<Application> applicantApplications = new ArrayList<>();
+    private FlatType determineRequestedFlatType(Application application) {
+        Applicant applicant = application.getApplicant();
         
-        for (Application app : applications) {
-            if (app.getApplicant().getNRIC().equals(applicant.getNRIC())) {
-                applicantApplications.add(app);
-            }
+        if (applicant.getMaritalStatus() == MaritalStatus.SINGLE) {
+            // Singles can only apply for 2-Room
+            return FlatType.TWO_ROOM;
+        } else {
+            // For married couples, check which type they want
+            // This would typically be stored in the application
+            // For now, we'll use a placeholder logic
+            Project project = application.getProject();
+            return project.getAvailableUnitsByType(FlatType.THREE_ROOM) > 0 ?
+                   FlatType.THREE_ROOM : FlatType.TWO_ROOM;
         }
-        
-        return applicantApplications;
     }
     
     /**
-     * Get application by ID
-     * @param applicationID the application ID
-     * @return the application, or null if not found
+     * Book a flat for an application
+     * @param application the application
+     * @param flatType the type of flat to book
+     * @return the booked flat, or null if booking failed
      */
-    public Application getApplicationByID(String applicationID) {
-        for (Application app : applications) {
-            if (app.getApplicationID().equals(applicationID)) {
-                return app;
-            }
+    public Flat bookFlat(Application application, FlatType flatType) {
+        // Check if application is successful and can be booked
+        if (!application.canBook()) {
+            return null;
         }
         
-        return null;
+        // Check flat availability
+        Project project = application.getProject();
+        if (project.getAvailableUnitsByType(flatType) <= 0) {
+            return null; // No available units
+        }
+        
+        // Generate a flat ID
+        String flatID = generateFlatID(project, flatType);
+        
+        // Create a new flat
+        Flat flat = new Flat(flatID, project, flatType);
+        
+        // Update application
+        application.setStatus(ApplicationStatus.BOOKED);
+        application.setBookedFlat(flat);
+        
+        // Decrement available units
+        project.decrementAvailableUnits(flatType);
+        projectControl.updateProject(project);
+        
+        // Update application
+        updateApplication(application);
+        
+        return flat;
     }
     
     /**
-     * Find an application by applicant NRIC and project
-     * @param nric the applicant's NRIC
+     * Generate a flat ID
      * @param project the project
-     * @return the application, or null if not found
+     * @param flatType the flat type
+     * @return a unique flat ID
      */
-    public Application findApplicationByNRICAndProject(String nric, Project project) {
-        for (Application app : applications) {
-            if (app.getApplicant().getNRIC().equals(nric) && 
-                app.getProject().getProjectID().equals(project.getProjectID())) {
-                return app;
-            }
-        }
-        
-        return null;
-    }
-    
-    /**
-     * Load applications from file
-     * @return list of applications
-     */
-    private List<Application> loadApplications() {
-        List<Application> loadedApplications = new ArrayList<>();
-        
-        try (Scanner fileScanner = new Scanner(new File(APPLICATIONS_FILE))) {
-            // Skip header if exists
-            if (fileScanner.hasNextLine()) {
-                fileScanner.nextLine();
-            }
-            
-            while (fileScanner.hasNextLine()) {
-                String line = fileScanner.nextLine().trim();
-                if (line.isEmpty()) continue;
-                
-                String[] values = line.split(",");
-                if (values.length < 7) continue; // Invalid line
-                
-                // Parse application data
-                try {
-                    String applicationID = values[0].trim();
-                    String applicantNRIC = values[1].trim();
-                    String projectID = values[2].trim();
-                    String statusStr = values[3].trim();
-                    long applicationDate = Long.parseLong(values[4].trim());
-                    long statusUpdateDate = Long.parseLong(values[5].trim());
-                    String bookedFlatID = values.length > 6 ? values[6].trim() : "";
-                    
-                    // Convert status string to enum
-                    ApplicationStatus status = ApplicationStatus.valueOf(statusStr);
-                    
-                    // Find applicant and project (in a real system, these would come from repositories)
-                    // For now, create placeholders
-                    Applicant applicant = new Applicant(
-                        "Applicant " + applicantNRIC, // Placeholder name
-                        applicantNRIC,
-                        "password",
-                        30, // Placeholder age
-                        "Single", // Placeholder marital status
-                        "Applicant"
-                    );
-                    
-                    Project project = new Project(
-                        projectID,
-                        "Project " + projectID, // Placeholder name
-                        "Neighborhood", // Placeholder neighborhood
-                        new HashMap<>(), // Placeholder units
-                        new Date(), // Placeholder open date
-                        new Date(), // Placeholder close date
-                        null, // Placeholder manager
-                        5 // Placeholder officer slots
-                    );
-                    
-                    // Create application with parsed data
-                    Application application = new Application(applicant, project);
-                    
-                    // Use reflection to set private fields (for demo purposes)
-                    // In a real application, you would have proper constructors or methods
-                    java.lang.reflect.Field idField = Application.class.getDeclaredField("applicationID");
-                    idField.setAccessible(true);
-                    idField.set(application, applicationID);
-                    
-                    java.lang.reflect.Field statusField = Application.class.getDeclaredField("status");
-                    statusField.setAccessible(true);
-                    statusField.set(application, status);
-                    
-                    java.lang.reflect.Field appDateField = Application.class.getDeclaredField("applicationDate");
-                    appDateField.setAccessible(true);
-                    appDateField.set(application, new Date(applicationDate));
-                    
-                    java.lang.reflect.Field updateDateField = Application.class.getDeclaredField("statusUpdateDate");
-                    updateDateField.setAccessible(true);
-                    updateDateField.set(application, new Date(statusUpdateDate));
-                    
-                    // Set booked flat if any
-                    if (!bookedFlatID.isEmpty()) {
-                        Flat flat = new Flat(bookedFlatID, project, FlatType.TWO_ROOM); // Placeholder flat type
-                        application.setBookedFlat(flat);
-                    }
-                    
-                    // Add to list
-                    loadedApplications.add(application);
-                    
-                } catch (Exception e) {
-                    System.err.println("Error parsing application data: " + e.getMessage());
-                }
-            }
-        } catch (FileNotFoundException e) {
-            System.out.println("Applications file not found. Starting with empty list.");
-        }
-        
-        return loadedApplications;
-    }
-    
-    /**
-     * Save applications to file
-     * @return true if successful, false otherwise
-     */
-    private boolean saveApplications() {
-        try {
-            // Create directories if they don't exist
-            File directory = new File("files/resources");
-            if (!directory.exists()) {
-                directory.mkdirs();
-            }
-            
-            try (PrintWriter writer = new PrintWriter(new FileWriter(APPLICATIONS_FILE))) {
-                // Write header
-                writer.println("ApplicationID,ApplicantNRIC,ProjectID,Status,ApplicationDate,StatusUpdateDate,BookedFlatID");
-                
-                // Write applications
-                for (Application app : applications) {
-                    writer.print(
-                        app.getApplicationID() + "," +
-                        app.getApplicant().getNRIC() + "," +
-                        app.getProject().getProjectID() + "," +
-                        app.getStatus() + "," +
-                        app.getApplicationDate().getTime() + "," +
-                        app.getStatusUpdateDate().getTime()
-                    );
-                    
-                    // Add booked flat ID if any
-                    if (app.getBookedFlat() != null) {
-                        writer.print("," + app.getBookedFlat().getFlatID());
-                    }
-                    
-                    writer.println();
-                }
-            }
-            
-            return true;
-        } catch (IOException e) {
-            System.err.println("Error saving applications: " + e.getMessage());
-            return false;
-        }
+    private String generateFlatID(Project project, FlatType flatType) {
+        // Simple algorithm: project ID + flat type prefix + timestamp
+        String typePrefix = flatType == FlatType.TWO_ROOM ? "2R" : "3R";
+        return "F-" + project.getProjectID() + "-" + typePrefix + "-" + System.currentTimeMillis() % 10000;
     }
 }
