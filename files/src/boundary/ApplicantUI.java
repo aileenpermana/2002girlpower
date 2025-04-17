@@ -1,5 +1,6 @@
 package boundary;
 
+import control.ApplicantControl;
 import control.ApplicationControl;
 import control.ProjectControl;
 import entity.*;
@@ -11,6 +12,7 @@ import utils.ScreenUtil;
 public class ApplicantUI {
     private Applicant currentUser;
     private Scanner sc;
+    private final ApplicantControl applicantControl;
     private ProjectControl projectControl;
     private ApplicationControl applicationControl;
     
@@ -28,9 +30,10 @@ public class ApplicantUI {
     /**
      * Constructor for ApplicantUI
      */
-    public ApplicantUI(Applicant user) {
+    public ApplicantUI(Applicant user, ApplicantControl applicantControl, ApplicationControl applicationControl) {
         this.currentUser = user;
         this.sc = new Scanner(System.in);
+        this.applicantControl = applicantControl;
         this.projectControl = new ProjectControl();
         this.applicationControl = new ApplicationControl();
         this.filterPreferences = new HashMap<>();
@@ -81,6 +84,18 @@ public class ApplicantUI {
     }
     
     /**
+    * Reads the user's menu choice from input.
+    * @return the trimmed user input as a string, or an empty string if an error occurs
+    */
+    private String readChoice() {
+        try {
+            return sc.nextLine().trim();
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    /**
      * View all available projects based on eligibility and visibility
      */
     private void viewAvailableProjects() {
@@ -112,7 +127,7 @@ public class ApplicantUI {
         System.out.println("2. Return to Main Menu");
         
         System.out.print("\nEnter your choice: ");
-        String choice = sc.nextLine();
+        String choice = readChoice();
         
         if (choice.equals("1")) {
             System.out.print("Enter project number to view details: ");
@@ -145,7 +160,7 @@ public class ApplicantUI {
         System.out.println("6. Availability (Descending)");
         
         System.out.print("\nEnter sort option (or press Enter to use previous/default): ");
-        String sortOption = sc.nextLine();
+        String sortOption = sc.nextLine().trim();
         
         if (!sortOption.trim().isEmpty()) {
             filterPreferences.put("sortBy", sortOption);
@@ -153,7 +168,7 @@ public class ApplicantUI {
         
         // Additional filters could be added here
         System.out.print("Filter by Neighborhood (leave blank for all): ");
-        String neighborhood = sc.nextLine();
+        String neighborhood = sc.nextLine().trim();
         
         if (!neighborhood.trim().isEmpty()) {
             filterPreferences.put("neighborhood", neighborhood);
@@ -162,7 +177,7 @@ public class ApplicantUI {
         }
         
         System.out.print("Filter by Flat Type (2-Room/3-Room, leave blank for all): ");
-        String flatType = sc.nextLine();
+        String flatType = sc.nextLine().trim();
         
         if (!flatType.trim().isEmpty()) {
             filterPreferences.put("flatType", flatType);
@@ -278,6 +293,9 @@ public class ApplicantUI {
      * @return truncated string
      */
     private String truncateString(String str, int maxLength) {
+        if (str == null) {
+            return "";
+        }
         if (str.length() <= maxLength) {
             return str;
         }
@@ -342,6 +360,14 @@ public class ApplicantUI {
             return;
         }
         
+        if (!currentUser.isEligibleForProject(project)) {
+            System.out.println("You are not eligible for this project.");
+            System.out.println("Eligibility: Singles 35 and below can apply for 2-Room flats; Married 21 and above can apply for any flat type.");
+            System.out.println("Press Enter to continue...");
+            sc.nextLine();
+            return;
+        }
+
         // Confirm application
         System.out.print("Confirm application for " + project.getProjectName() + "? (Y/N): ");
         String confirm = sc.nextLine();
@@ -609,8 +635,13 @@ public class ApplicantUI {
         }
         
         // Change password
-        currentUser.setPassword(newPassword);
-        System.out.println("Password changed successfully!");
+        try {
+            currentUser.changePassword(newPassword);
+            System.out.println("Password changed successfully!");
+        } catch (IllegalArgumentException e) {
+            System.out.println(e.getMessage());
+        }
+
         System.out.println("Press Enter to continue...");
         sc.nextLine();
     }

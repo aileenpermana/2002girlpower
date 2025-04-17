@@ -6,13 +6,14 @@ import java.io.FileNotFoundException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Controls operations related to Applicants in the BTO system.
  */
 public class ApplicantControl {
     private static final String PROJECT_FILE = "files/resources/ProjectList.csv";
-    private List<Project> projects;
+    private final List<Project> projects;
     
     /**
      * Constructor initializes the projects list from storage
@@ -31,7 +32,7 @@ public class ApplicantControl {
         
         for (Project project : projects) {
             // Check visibility
-            if (!project.isVisible()) {
+            if (!project.isVisible()|| !project.isOpenForApplication()) {
                 continue; // Skip invisible projects
             }
             
@@ -118,16 +119,10 @@ public class ApplicantControl {
         if (neighborhood == null || neighborhood.trim().isEmpty()) {
             return new ArrayList<>(projects);
         }
-        
-        List<Project> filteredProjects = new ArrayList<>();
-        
-        for (Project project : projects) {
-            if (project.getNeighborhood().equalsIgnoreCase(neighborhood)) {
-                filteredProjects.add(project);
-            }
-        }
-        
-        return filteredProjects;
+
+        return projects.stream()
+            .filter(p -> p.getNeighborhood().equalsIgnoreCase(neighborhood))
+            .collect(Collectors.toList());
     }
     
     /**
@@ -141,7 +136,7 @@ public class ApplicantControl {
             return new ArrayList<>(projects);
         }
         
-        FlatType flatType = null;
+        FlatType flatType = FlatType.fromString(flatTypeStr);
         if (flatTypeStr.equalsIgnoreCase("2-Room")) {
             flatType = FlatType.TWO_ROOM;
         } else if (flatTypeStr.equalsIgnoreCase("3-Room")) {
@@ -164,14 +159,12 @@ public class ApplicantControl {
     /**
      * Calculate total available units across all flat types
      * @param project the project
-     * @return total available units
+     * @return total available units 
      */
     private int calculateTotalAvailableUnits(Project project) {
-        int total = 0;
-        for (FlatType type : project.getFlatTypes()) {
-            total += project.getAvailableUnitsByType(type);
-        }
-        return total;
+        return project.getFlatTypes().stream()
+            .mapToInt(project::getAvailableUnitsByType)
+            .sum();
     }
     
     /**

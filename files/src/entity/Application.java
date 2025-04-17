@@ -6,11 +6,11 @@ import java.util.Date;
  * Represents a BTO application in the system.
  */
 public class Application {
-    private String applicationID;
-    private Applicant applicant;
-    private Project project;
+    private final String applicationID;
+    private final Applicant applicant;
+    private final Project project;
     private ApplicationStatus status;
-    private Date applicationDate;
+    private final Date applicationDate;
     private Date statusUpdateDate;
     private Flat bookedFlat;
     
@@ -72,8 +72,16 @@ public class Application {
      * @param status new status
      */
     public void setStatus(ApplicationStatus status) {
-        this.status = status;
-        this.statusUpdateDate = new Date(); // Update status update date
+        // Validate status transitions
+        if (this.status == ApplicationStatus.PENDING && 
+            (status == ApplicationStatus.SUCCESSFUL || status == ApplicationStatus.UNSUCCESSFUL)) {
+            this.status = status;
+        } else if (this.status == ApplicationStatus.SUCCESSFUL && status == ApplicationStatus.BOOKED) {
+            this.status = status;
+        } else {
+            throw new IllegalStateException("Invalid status transition from " + this.status + " to " + status);
+        }
+        this.statusUpdateDate = new Date();
     }
     
     /**
@@ -105,7 +113,11 @@ public class Application {
      * @param flat the flat that has been booked
      */
     public void setBookedFlat(Flat flat) {
+        if (!canBook()) {
+            throw new IllegalStateException("Cannot book flat in current status: " + status);
+        }
         this.bookedFlat = flat;
+        this.applicant.setBookedFlat(flat);
     }
     
     /**

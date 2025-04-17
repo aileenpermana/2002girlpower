@@ -8,7 +8,7 @@ import java.util.List;
  * Extends the User class with additional applicant-specific functionality.
  */
 public class Applicant extends User {
-    private List<Application> applications;
+    private final List<Application> applications;
     private Flat bookedFlat;
     
     /**
@@ -61,7 +61,7 @@ public class Applicant extends User {
      * @param project the project to check eligibility for
      * @return true if eligible, false otherwise
      */
-    private boolean isEligibleForProject(Project project) {
+    public boolean isEligibleForProject(Project project) {
         // Singles, 35 years old and above, can ONLY apply for 2-Room
         if (getMaritalStatus() == MaritalStatus.SINGLE) {
             if (getAge() < 35) {
@@ -127,6 +127,15 @@ public class Applicant extends User {
         return false;
     }
     
+    public boolean hasSuccessfulApplication() {
+        for (Application app : applications) {
+            if (app.getStatus() == ApplicationStatus.SUCCESSFUL) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * Request withdrawal of an application
      * @param application the application to withdraw
